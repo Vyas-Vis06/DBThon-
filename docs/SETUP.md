@@ -9,7 +9,7 @@ install but Python) and the **real PostgreSQL** route (Docker or a native server
 |---|---|---|
 | Python | **3.11 or 3.12** (the embedded PostgreSQL wheel, `pgserver`, has no build for 3.13+) | 3.11+ |
 | PostgreSQL | none: PostgreSQL 16 ships inside the `pgserver` wheel | 15 or newer (16 recommended); no extensions needed |
-| OS | Windows, macOS, Linux (CI runs Windows and Linux) | any |
+| OS | Windows, macOS, Linux (all three run in CI) | any |
 
 **Have only Python 3.13 or newer?** Install 3.12 next to it, then use it for this project's venv:
 

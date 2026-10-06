@@ -13,7 +13,7 @@ python -m pytest -x --lf                      # stop at the first failure; rerun
 
 Needs the dev install (`pip install -e ".[dev]"`) on **Python 3.11 or 3.12** (the embedded PostgreSQL wheel does not exist
 for 3.13+; the tests say so and stop). No Docker, no PostgreSQL install, no `.env`: the harness starts its own server.
-CI runs the same command on Linux and Windows, Python 3.11 and 3.12 (`.github/workflows/ci.yml`).
+CI runs the same command on Linux and Windows (Python 3.11 and 3.12) and macOS (Python 3.12) (`.github/workflows/ci.yml`).
 
 ## How the harness isolates tests
 

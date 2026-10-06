@@ -42,7 +42,7 @@ was run; `[~]` = done with a stated limit. Last full pass: 2026-10-07 (see [DEV_
 
 | | Requirement | Evidence |
 |---|---|---|
-| [x] | Runs from a fresh clone | fresh clone + fresh venv + install + full suite, 2026-10-07; CI on Linux and Windows |
+| [x] | Runs from a fresh clone | fresh clone + fresh venv + install + full suite, 2026-10-07; CI on Linux, Windows and macOS |
 | [x] | Tests at several levels | unit, database, API ([TESTING.md](../TESTING.md)) |
 | [x] | Migrations and seed data | `database/migrations/` (10, forward-only); `database/seeds/` (deterministic, idempotent; `tests/db/test_seed.py`) |
 | [x] | No secrets in the repository | `.env.example` placeholders only; dev secrets generated into git-ignored `.pgdata/` |

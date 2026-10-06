@@ -51,7 +51,7 @@ python -m pytest -n auto               # about 500 tests in about 2 minutes; eac
 | UI | no-build browser UI, strict CSP | walked through by hand; `tests/api/test_web.py` (no headless-browser tests) |
 | SQL showcase | joins, aggregates, search, division, anti-join, views, transactions, trigger refusals | `database/queries/`, each file run by `tests/db/test_demo_queries.py` |
 
-CI runs the whole suite on Linux and Windows with Python 3.11 and 3.12.
+CI runs the whole suite on Linux and Windows (Python 3.11 and 3.12) and macOS (Python 3.12).
 
 ## Repository map
 

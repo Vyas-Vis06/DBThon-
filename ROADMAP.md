@@ -8,7 +8,7 @@ A task is never `[x]` on "it compiles".
 
 ## Current state (2026-10-07): read this first
 
-M0-M5 are implemented. Everything marked `[x]` is verified by the test suite (run on Linux and Windows in CI) or by the command
+M0-M5 are implemented. Everything marked `[x]` is verified by the test suite (run on Linux, Windows and macOS in CI) or by the command
 named in the row. The only `[-]` rows are the UI screens: built and walked through by hand in a browser (the demo flow again on
 2026-10-07), but **not covered by automated browser tests**.
 
@@ -49,7 +49,7 @@ milestone as the code they describe.
 | M0-06 | Test harness: embedded PG per session, template clone per test | [x] | every DB test |
 | M0-07 | Documentation set (all required files exist, links resolve) | [x] | `tests/unit/test_docs.py` |
 | M0-08 | `scripts/db.py` (migrate/bootstrap/new/reset) and `scripts/dev.py` (one-command run) | [x] | `tests/db/test_db_script.py`; `dev.py` run from a fresh clone (2026-10-07) |
-| M0-09 | Publish to GitHub; CI on Linux and Windows, Python 3.11 and 3.12 | [x] | `.github/workflows/ci.yml` (see the Actions tab) |
+| M0-09 | Publish to GitHub; CI on Linux and Windows (Python 3.11, 3.12) and macOS (3.12) | [x] | `.github/workflows/ci.yml` (see the Actions tab) |
 
 **Acceptance:** `python -m pytest` green; app starts; `/health` returns `database: up`.
 

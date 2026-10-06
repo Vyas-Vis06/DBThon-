@@ -7,7 +7,7 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 ## 2026-10-07 · Documentation, a concurrency fix, cross-platform support, published to GitHub
 
 **State:** M0-M5 complete; only the UI rows stay `[-]` (manual browser verification, no automated browser tests). Repository at
-<https://github.com/Vyas-Vis06/DBThon->, CI green on Linux and Windows × Python 3.11 and 3.12. Final local run: see the end of
+<https://github.com/Vyas-Vis06/DBThon->, CI green on Linux and Windows × Python 3.11 and 3.12, and macOS × 3.12. Final local run: see the end of
 this entry.
 
 ### Done
