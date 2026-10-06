@@ -12,9 +12,14 @@ import itertools
 import pathlib
 from dataclasses import dataclass
 
-import pgserver
 import psycopg
 import pytest
+
+try:
+    import pgserver
+except ImportError:                              # no wheel for this Python: say what to do instead of a traceback
+    pytest.exit("The tests start an embedded PostgreSQL from the `pgserver` wheel, which exists for Python 3.9-3.12 only. "
+                "Create the venv with Python 3.11 or 3.12 (see docs/SETUP.md), then: pip install -e \".[dev]\"", returncode=4)
 from alembic import command
 from alembic.config import Config
 from psycopg.conninfo import conninfo_to_dict

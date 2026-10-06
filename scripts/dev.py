@@ -36,6 +36,9 @@ def main() -> None:
         from psycopg import sql
         from psycopg.conninfo import conninfo_to_dict
     except ImportError as exc:
+        if exc.name == "pgserver" and sys.version_info >= (3, 13):
+            sys.exit("The embedded PostgreSQL (pgserver) has wheels for Python 3.9-3.12 only. Recreate the venv with "
+                     "Python 3.11 or 3.12, or run against a real PostgreSQL server: see docs/SETUP.md.")
         sys.exit(f"Missing dependency ({exc.name}). From the repository root run:  pip install -e \".[dev]\"")
     from alembic import command
 

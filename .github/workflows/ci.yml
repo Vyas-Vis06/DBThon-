@@ -1,5 +1,6 @@
 # Runs the whole test suite on every push and pull request.
-# No PostgreSQL service is needed: the tests start an embedded PostgreSQL 16 from the `pgserver` wheel.
+# No PostgreSQL service is needed: the tests start an embedded PostgreSQL 16 from the `pgserver` wheel,
+# which exists for Python 3.9-3.12 on Linux, macOS and Windows.
 name: tests
 
 on:
@@ -27,4 +28,17 @@ jobs:
       - name: Install
         run: python -m pip install -e ".[dev]"
       - name: Test
-        run: python -m pytest -n auto
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest -n auto 2>&1 | tee pytest.log
+      # Job logs need a GitHub sign-in; annotations do not. Put the end of a failing run where anyone can read it.
+      - name: Show the failure in the run summary
+        if: failure()
+        shell: bash
+        run: |
+          python - <<'EOF'
+          from pathlib import Path
+          tail = Path("pytest.log").read_text(errors="replace").splitlines()[-60:]
+          print("::error title=pytest (last 60 lines)::" + "%0A".join(l.replace("%", "%25").replace("\r", "") for l in tail))
+          EOF

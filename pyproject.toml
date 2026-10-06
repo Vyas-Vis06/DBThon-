@@ -20,8 +20,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# pgserver ships an embedded PostgreSQL 16 wheel: no Docker or system install needed for dev/tests.
-dev = ["pytest>=8", "pytest-xdist>=3", "httpx>=0.27", "pgserver>=0.1.4"]
+# pgserver ships an embedded PostgreSQL 16 wheel (no Docker or system install needed for dev/tests). It has wheels for
+# Python 3.9-3.12 only. On newer Pythons the package still installs and the app runs against a real PostgreSQL server
+# (docs/SETUP.md), but the tests and scripts/dev.py need Python 3.11 or 3.12.
+dev = ["pytest>=8", "pytest-xdist>=3", "httpx>=0.27", "pgserver>=0.1.4; python_version < '3.13'"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
