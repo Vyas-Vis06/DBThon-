@@ -1,7 +1,20 @@
 """Engine and session factories. No module-level engine: the app factory owns the lifecycle."""
 
-from sqlalchemy import Engine, create_engine, text
+from psycopg.conninfo import conninfo_to_dict
+from sqlalchemy import URL, Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
+
+
+def url_for(conninfo: str, database: str, user: str = "postgres", password: str | None = None) -> str:
+    """SQLAlchemy URL for `database` on the server a libpq URI points at (used with the embedded pgserver).
+
+    Host and port travel in the query string, so a Unix-socket directory (pgserver on Linux and macOS) works as well as
+    host:port (pgserver on Windows).
+    """
+    info = conninfo_to_dict(conninfo)
+    query = {key: info[key] for key in ("host", "port") if info.get(key)}
+    return URL.create("postgresql+psycopg", username=user, password=password, database=database,
+                      query=query).render_as_string(hide_password=False)
 
 
 def make_engine(url: str) -> Engine:

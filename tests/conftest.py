@@ -22,11 +22,13 @@ except ImportError:                              # no wheel for this Python: say
                 "Create the venv with Python 3.11 or 3.12 (see docs/SETUP.md), then: pip install -e \".[dev]\"", returncode=4)
 from alembic import command
 from alembic.config import Config
-from psycopg.conninfo import conninfo_to_dict
+from psycopg.conninfo import make_conninfo
 from psycopg.rows import dict_row
 
+from zeroentry.db import url_for
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-APP_PASSWORD = "ze_test_only"  # throwaway cluster on 127.0.0.1; never reused anywhere else
+APP_PASSWORD = "ze_test_only"  # throwaway local cluster; never reused anywhere else
 _counter = itertools.count(1)
 
 
@@ -40,18 +42,17 @@ def migrate(url: str) -> None:
 
 @dataclass(frozen=True)
 class Cluster:
-    host: str
-    port: int
+    uri: str            # libpq URI from pgserver: TCP on Windows, a Unix-socket directory on Linux and macOS
 
     def owner_url(self, db: str) -> str:
-        return f"postgresql+psycopg://postgres@{self.host}:{self.port}/{db}"
+        return url_for(self.uri, db)
 
     def app_url(self, db: str) -> str:
-        return f"postgresql+psycopg://ze_app:{APP_PASSWORD}@{self.host}:{self.port}/{db}"
+        return url_for(self.uri, db, "ze_app", APP_PASSWORD)
 
     def connect(self, db: str, user: str = "postgres", autocommit: bool = True) -> psycopg.Connection:
-        password = APP_PASSWORD if user == "ze_app" else None
-        return psycopg.connect(host=self.host, port=self.port, dbname=db, user=user, password=password,
+        password = APP_PASSWORD if user == "ze_app" else ""
+        return psycopg.connect(make_conninfo(self.uri, dbname=db, user=user, password=password),
                                autocommit=autocommit, row_factory=dict_row)
 
 
@@ -77,9 +78,8 @@ class Db:
 @pytest.fixture(scope="session")
 def cluster(tmp_path_factory) -> Cluster:
     srv = pgserver.get_server(tmp_path_factory.mktemp("pg"), cleanup_mode="delete")
-    info = conninfo_to_dict(srv.get_uri())
     try:
-        yield Cluster(host=info["host"], port=int(info["port"]))
+        yield Cluster(srv.get_uri())
     finally:
         srv.cleanup()
 

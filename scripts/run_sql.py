@@ -25,8 +25,9 @@ def table(columns: list[str], rows: list[tuple]) -> str:
 
 def dsn_for_dev() -> str:
     import pgserver
+    from psycopg.conninfo import make_conninfo
     server = pgserver.get_server(ROOT / ".pgdata" / "cluster", cleanup_mode=None)      # attaches to the running dev database
-    return server.get_uri().rsplit("/", 1)[0] + "/zeroentry"
+    return make_conninfo(server.get_uri(), dbname="zeroentry")
 
 
 def main() -> None:

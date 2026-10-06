@@ -15,9 +15,11 @@ from pathlib import Path
 import pgserver
 import psycopg
 from alembic import command
+from psycopg.conninfo import make_conninfo
 
 from zeroentry.api_doc import endpoint_table, splice
 from zeroentry.config import Settings
+from zeroentry.db import url_for
 from zeroentry.main import create_app
 from zeroentry.schema_doc import generate
 
@@ -29,12 +31,10 @@ def schema_reference() -> str:
     with tempfile.TemporaryDirectory(prefix="ze_schema_doc_") as tmp:
         server = pgserver.get_server(Path(tmp) / "cluster", cleanup_mode="delete")
         try:
-            info = psycopg.conninfo.conninfo_to_dict(server.get_uri())
             with psycopg.connect(server.get_uri(), autocommit=True) as admin:
                 admin.execute("CREATE DATABASE schema_doc")
-            url = f"postgresql+psycopg://postgres@{info['host']}:{info['port']}/schema_doc"
-            command.upgrade(alembic_config(url), "head")
-            with psycopg.connect(url.replace("+psycopg", "")) as conn:
+            command.upgrade(alembic_config(url_for(server.get_uri(), "schema_doc")), "head")
+            with psycopg.connect(make_conninfo(server.get_uri(), dbname="schema_doc")) as conn:
                 return generate(conn)
         finally:
             server.cleanup()

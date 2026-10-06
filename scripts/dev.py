@@ -34,7 +34,6 @@ def main() -> None:
         import psycopg
         import uvicorn
         from psycopg import sql
-        from psycopg.conninfo import conninfo_to_dict
     except ImportError as exc:
         if exc.name == "pgserver" and sys.version_info >= (3, 13):
             sys.exit("The embedded PostgreSQL (pgserver) has wheels for Python 3.9-3.12 only. Recreate the venv with "
@@ -42,6 +41,7 @@ def main() -> None:
         sys.exit(f"Missing dependency ({exc.name}). From the repository root run:  pip install -e \".[dev]\"")
     from alembic import command
 
+    from zeroentry.db import url_for
     from zeroentry.seed import DEMO_USERS, EMAIL_DOMAIN, run_seed
     sys.path.insert(0, str(Path(__file__).parent))
     from db import alembic_config
@@ -57,10 +57,8 @@ def main() -> None:
     print("Starting the embedded PostgreSQL 16 (first start takes about 10 seconds) ...")
     server = pgserver.get_server(home / "cluster", cleanup_mode="stop")
     try:
-        info = conninfo_to_dict(server.get_uri())
-        host, port = info["host"], int(info["port"])
-        owner_url = f"postgresql+psycopg://postgres@{host}:{port}/{DB_NAME}"
-        app_url = f"postgresql+psycopg://ze_app:{keep['app_db_password']}@{host}:{port}/{DB_NAME}"
+        owner_url = url_for(server.get_uri(), DB_NAME)
+        app_url = url_for(server.get_uri(), DB_NAME, "ze_app", keep["app_db_password"])
 
         with psycopg.connect(server.get_uri(), autocommit=True) as admin:
             if args.reset:
