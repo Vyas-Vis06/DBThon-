@@ -1,0 +1,4 @@
+# Same line endings on every machine: SQL, Markdown and Python are stored and checked out with LF.
+* text=auto eol=lf
+*.pdf binary
+*.png binary

@@ -1,0 +1,47 @@
+# --- Python / tooling -------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Secrets and local configuration (never commit) --------------------------
+.env
+.env.*
+!.env.example
+
+# --- Local databases, embedded PostgreSQL data, logs, generated output -------
+.pgdata/
+pgdata/
+*.sqlite
+*.sqlite3
+*.db
+*.log
+logs/
+tmp/
+.tmp/
+
+# --- Editors / OS -------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Agent-local settings (CLAUDE.md / AGENTS.md at the root are shared) ------
+.claude/settings.local.json
+.claude/launch.json
+
+# --- Files that sit in this folder but are not part of the project ------------
+# A different DBThon idea (CampusContinuity) and a PDF export of the proposal.
+/CampusContinuity_Project_Proposal.*
+/18951d24-6319-40cf-880b-1100f550f5cb.pdf
+# Working original of the proposal; the tracked copy is docs/proposal/.
+/ZeroEntry_DBThon2026_Proposal.md
