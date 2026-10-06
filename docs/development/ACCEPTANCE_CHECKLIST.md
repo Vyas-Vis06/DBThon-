@@ -35,7 +35,7 @@ was run; `[~]` = done with a stated limit. Last full pass: 2026-10-07 (see [DEV_
 |---|---|---|
 | [x] | Authentication | sessions, bcrypt, lockout, throttle, CSRF ([SECURITY.md](../../SECURITY.md)); `tests/api/test_auth.py` |
 | [x] | ≥ 2 roles with RBAC | 6 roles; every endpoint × every role probed (`tests/api/test_rbac.py`, 176 cases); RLS (`tests/db/test_rls.py`) |
-| [~] | Usable UI | every screen built; demo flow walked through in a browser on 2026-10-07 ([DEMO_SCRIPT.md](DEMO_SCRIPT.md)); **no automated browser tests** |
+| [~] | Usable UI | every screen built and clicked through by hand (first session); on 2026-10-07 the demo flow was re-checked partly in the UI and partly through the endpoints the forms call ([DEMO_SCRIPT.md](DEMO_SCRIPT.md)); **no automated browser tests** |
 | [x] | Input validation and readable errors | one error envelope ([API_SPEC.md](../API_SPEC.md#errors)); `test_validation_errors_share_one_shape_and_name_the_field` |
 
 ## Engineering

@@ -1,7 +1,9 @@
 # Demo script (about 3 minutes)
 
-Every step below was run against freshly seeded data on 2026-10-07 and behaved as written. Start from a clean database so the
-story matches: `python scripts/dev.py --reset`. Keep the printed password at hand.
+Checked on freshly seeded data on 2026-10-07: the denial, the authorise button and the incidents screen were clicked in the UI;
+crew, gear, readings, entries, the rule change, the dismissal and the scan were sent to the same API endpoints the forms call,
+and every outcome below matched. `06_transactions.sql` was not re-run that day (it is run by the test suite). Start from a clean
+database so the story matches: `python scripts/dev.py --reset`. Keep the printed password at hand.
 
 **Before you start:** entries are allowed only in daylight (06:00-18:00 IST, assumption A-03). If you present outside those
 hours, sign in as `admin@`, open **Admin → Rules (law as data)** and set `daylight_start_hour` to 0 and `daylight_end_hour` to 24.

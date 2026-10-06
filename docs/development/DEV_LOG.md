@@ -28,9 +28,9 @@ this entry.
   extra is now conditional and the tests / `dev.py` stop with an instruction on 3.13+ (verified with 3.13 locally).
 * **`scripts/db.py`** `bootstrap`, `reset`, `new` now tested (`tests/db/test_db_script.py`).
 * **Fresh-clone check:** clone → new venv → `pip install -e ".[dev]"` → full suite green (Windows, Python 3.11). The demo flow was
-  re-run end to end on fresh data from a clone (`dev.py`): five-clause denial, calibration refusal, authorisation, daylight
-  refusal, audited rule change, 95-minute / standby / overlap / close-while-inside refusals, alert dismissal releasing only its
-  hold, idempotent rescan.
+  re-checked on fresh data from a clone (`dev.py`), partly by clicking (denial, authorise button, incidents) and partly through
+  the endpoints the forms call: five-clause denial, calibration refusal, authorisation, daylight refusal, audited rule change,
+  95-minute / standby / overlap / close-while-inside refusals, alert dismissal releasing only its hold, idempotent rescan.
 
 ### Known issues
 * The first CI run had one Windows/3.12 failure whose log needs a GitHub sign-in; later runs on the same OS/Python were green.
