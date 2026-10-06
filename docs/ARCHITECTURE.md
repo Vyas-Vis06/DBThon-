@@ -62,7 +62,7 @@ sequenceDiagram
   participant A as FastAPI (deps + router)
   participant P as PostgreSQL
   B->>A: POST /permits/42/authorise (cookie, X-CSRF-Token, Origin)
-  A->>P: BEGIN; look up session by SHA-256(token)
+  A->>P: BEGIN, look up the session by SHA-256(token)
   A->>A: same origin? CSRF token matches? role in (SUPERVISOR, ENGINEER)?
   A->>P: set_config('app.user_id', ..., true) and role, contractor, worker
   A->>P: SELECT * FROM authorise_entry(42, user, now())
