@@ -4,6 +4,51 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 
 ---
 
+## 2026-10-07 · Documentation, a concurrency fix, cross-platform support, published to GitHub
+
+**State:** M0-M5 complete; only the UI rows stay `[-]` (manual browser verification, no automated browser tests). Repository at
+<https://github.com/Vyas-Vis06/DBThon->, CI green on Linux and Windows × Python 3.11 and 3.12. Final local run: see the end of
+this entry.
+
+### Done
+* **Docs:** ARCHITECTURE, DATABASE_DESIGN (3NF / FD analysis, gate, detection, locking, indexes), ER_DIAGRAM (four Mermaid
+  diagrams), API_SPEC (endpoint table **generated** from the role guards), SETUP, TESTING, SECURITY, CONTRIBUTING, ADRs
+  (`docs/decisions/`), DEMO_SCRIPT, ACCEPTANCE_CHECKLIST, README rewritten for teammates and their agents; AGENTS/CLAUDE made
+  machine-neutral. `scripts/gen_docs.py` replaces `gen_schema_doc.py`.
+* **Drift tests:** endpoint table vs routes and OpenAPI; every API route guarded; every table drawn and described; every drawn
+  relationship is a real FK and every non-actor FK is drawn; Markdown links resolve; every `BR-nn`/`A-nn` cited in code exists
+  (found `A-10`, cited by `v_contractor_risk` but never defined: added to PROJECT_SPEC).
+* **Concurrency bug (real):** guards read the permit status without a lock. Four races committed before the fix (standby
+  removed / un-geared entrant added during `authorise_entry`, raw `UPDATE` racing an uncommitted crew change, entry started
+  while the permit closed). Migration `0010` (`lock_permit()`, `FOR SHARE`) fixes them; `tests/db/test_concurrency.py` fails on
+  all four without `0010` and passes with it. A comment in `database/queries/06_transactions.sql` claimed this was already safe;
+  corrected.
+* **Cross-platform:** CI showed `KeyError: 'port'` on Linux (pgserver uses a Unix socket there). `zeroentry.db.url_for()` and
+  `make_conninfo()` fix the harness, `dev.py`, `gen_docs.py`, `run_sql.py`. pgserver has wheels for Python 3.9-3.12 only: the dev
+  extra is now conditional and the tests / `dev.py` stop with an instruction on 3.13+ (verified with 3.13 locally).
+* **`scripts/db.py`** `bootstrap`, `reset`, `new` now tested (`tests/db/test_db_script.py`).
+* **Fresh-clone check:** clone → new venv → `pip install -e ".[dev]"` → full suite green (Windows, Python 3.11). The demo flow was
+  re-run end to end on fresh data from a clone (`dev.py`): five-clause denial, calibration refusal, authorisation, daylight
+  refusal, audited rule change, 95-minute / standby / overlap / close-while-inside refusals, alert dismissal releasing only its
+  hold, idempotent rescan.
+
+### Known issues
+* The first CI run had one Windows/3.12 failure whose log needs a GitHub sign-in; later runs on the same OS/Python were green.
+  If it recurs, read the "pytest (last 60 lines)" annotation the workflow now writes.
+* After a forced kill, the embedded PostgreSQL's crash recovery can outlast pgserver's 10-second start timeout; running
+  `dev.py` again works (SETUP troubleshooting).
+* `database/queries/07_trigger_refusals.sql` needs a DRAFT permit for two of its nine refusals (run it before authorising the
+  demo permit, as DEMO_SCRIPT says).
+* Legal references still to be verified against the Gazette.
+
+### Final local run
+`python -m pytest -n 6` on Windows, Python 3.11: **509 passed in 104 s** (2026-10-07).
+
+### Next step
+Automated browser test of the demo flow; CI job against a real PostgreSQL service container; backlog in ROADMAP.
+
+---
+
 ## 2026-10-06 · End of the first build session (usage limit reached)
 
 **State:** M0-M4 complete and tested; M5 (UI) built and manually verified. **492 tests passed in 105 s**

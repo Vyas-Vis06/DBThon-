@@ -6,19 +6,19 @@ Requirements live in [PROJECT_SPEC.md](PROJECT_SPEC.md); history of decisions in
 Legend: `[ ]` not started · `[-]` in progress · `[x]` implemented **and verified by a test or command named in the row**.
 A task is never `[x]` on "it compiles".
 
-## Current state (2026-10-06): read this first
+## Current state (2026-10-07): read this first
 
-M0-M4 are implemented and verified by **492 passing tests** (`python -m pytest -n 6`). `[-]` means "implemented but not fully verified or not
-finished", precisely:
+M0-M5 are implemented. Everything marked `[x]` is verified by the test suite (run on Linux and Windows in CI) or by the command
+named in the row. The only `[-]` rows are the UI screens: built and walked through by hand in a browser (the demo flow again on
+2026-10-07), but **not covered by automated browser tests**.
 
-* **M0-07 / M1-06:** README, PROJECT_SPEC, ROADMAP, AGENTS, CLAUDE, DEV_LOG and the generated `docs/SCHEMA_REFERENCE.md` exist. **Not written:**
-  ARCHITECTURE, DATABASE_DESIGN, ER_DIAGRAM, API_SPEC, SETUP, TESTING, SECURITY, CONTRIBUTING, `docs/decisions/` ADRs.
-* **M0-08:** `scripts/dev.py` was verified by running it; `scripts/db.py` (`bootstrap`, `new`, `reset`) has no test.
-* **M5-01..05:** every screen is built and was **manually verified in a browser** (list in DEV_LOG); there are no automated browser tests.
-* **M5-06:** `database/queries/06_transactions.sql` and `07_trigger_refusals.sql` demonstrate rollback and refusals (tested); the narrated
-  `docs/development/DEMO_SCRIPT.md` and `scripts/demo.py` are **not written**. **M5-07, M5-08:** not started (also no `docker-compose.yml`).
+Changed in the second session: the full documentation set and its drift tests; a real concurrency bug in the entry gate found and
+fixed (M2-08); Linux/macOS support for the embedded PostgreSQL (CI caught it); tests for `scripts/db.py`; the repository published
+to GitHub with CI.
 
-Next step: write the missing documents (add a drift test as each lands), then M5-06..08. Details: [DEV_LOG.md](docs/development/DEV_LOG.md).
+Next step: pick from the backlog below (automated browser tests first), and verify the legal references against the Gazette
+before presenting. Details: [DEV_LOG.md](docs/development/DEV_LOG.md).
+
 ## Milestone map
 
 ```mermaid
@@ -47,8 +47,9 @@ milestone as the code they describe.
 | M0-04 | Alembic + raw `.sql` migrations (`migrate.py`, `database/migrations/`) | [x] | `tests/db/test_foundation.py` |
 | M0-05 | App factory, `/health` with real DB round-trip, central error mapping | [x] | `tests/db/test_foundation.py`, `tests/unit/...` |
 | M0-06 | Test harness: embedded PG per session, template clone per test | [x] | every DB test |
-| M0-07 | Documentation skeleton (all required files exist) | [-] | file list (filled in as features land) |
-| M0-08 | `scripts/db.py` (migrate/bootstrap/new/reset) and `scripts/dev.py` (one-command run) | [-] | manual run documented in SETUP.md |
+| M0-07 | Documentation set (all required files exist, links resolve) | [x] | `tests/unit/test_docs.py` |
+| M0-08 | `scripts/db.py` (migrate/bootstrap/new/reset) and `scripts/dev.py` (one-command run) | [x] | `tests/db/test_db_script.py`; `dev.py` run from a fresh clone (2026-10-07) |
+| M0-09 | Publish to GitHub; CI on Linux and Windows, Python 3.11 and 3.12 | [x] | `.github/workflows/ci.yml` (see the Actions tab) |
 
 **Acceptance:** `python -m pytest` green; app starts; `/health` returns `database: up`.
 
@@ -61,7 +62,7 @@ milestone as the code they describe.
 | M1-03 | Indexes for joins, filters and the detection anti-joins | [x] |
 | M1-04 | SQLAlchemy 2.0 models mapped onto the SQL-defined tables; test that models match the reflected schema | [x] |
 | M1-05 | Deterministic demo seed (3 Chennai zones, 60 manholes, 40 workers, 5 contractors, 2 detectors one expired) + users with a generated password | [x] |
-| M1-06 | `DATABASE_DESIGN.md`, `ER_DIAGRAM.md`, drift test (tables in DB = tables in the doc) | [-] |
+| M1-06 | `DATABASE_DESIGN.md`, `ER_DIAGRAM.md`, drift tests (every table described and drawn; every drawn relationship is a real FK) | [x] |
 
 **Acceptance:** ≥ 8 related tables (target 30), every table has a PK, FKs and CHECKs reject bad data (tests),
 seed is idempotent, models match the DB.
@@ -77,6 +78,7 @@ seed is idempotent, models match the DB.
 | M2-05 | Waiver triggers (approver role, `MACHINE_FAILED` needs a failed deployment), job-contractor guard | [x] |
 | M2-06 | `record_incident()` procedure: case + blacklist + abort + holds, atomic; rollback test | [x] |
 | M2-07 | Views: `v_permit_compliance`, `v_compensation_overdue`, `v_contractor_risk`, `v_invoice_status`, `v_ulb_year_kpi`, `v_ulb_year_incidents` | [x] |
+| M2-08 | Concurrency: evidence changes serialised with permit decisions (migration `0010`, `lock_permit()`); four races reproduced and closed | [x] |
 
 **Acceptance:** every clause has a pass and a fail test; the gate cannot be bypassed; forced failure in
 `record_incident()` leaves zero rows behind.
@@ -117,9 +119,9 @@ seed is idempotent, models match the DB.
 | M5-03 | **Permit wizard with red/green clause checklist** | [-] |
 | M5-04 | Shadow-entry review screen, incident and compensation screens | [-] |
 | M5-05 | Reports, admin | [-] |
-| M5-06 | Scripted 3-minute demo + rollback demo (`scripts/demo.py`, `docs/development/DEMO_SCRIPT.md`) | [-] |
-| M5-07 | Final acceptance pass against `docs/development/ACCEPTANCE_CHECKLIST.md` | [ ] |
-| M5-08 | CI workflow (`.github/workflows/ci.yml`); **not executed in this environment** | [ ] |
+| M5-06 | Narrated 3-minute demo, verified step by step on fresh data (`docs/development/DEMO_SCRIPT.md`); the rollback and refusal demos are `database/queries/06-07` (tested). A separate `scripts/demo.py` was dropped: it would duplicate both. | [x] |
+| M5-07 | Final acceptance pass against `docs/development/ACCEPTANCE_CHECKLIST.md` | [x] |
+| M5-08 | CI workflow (`.github/workflows/ci.yml`), green on GitHub Actions | [x] |
 
 ---
 
@@ -137,6 +139,9 @@ Agree on those two files and the streams do not collide.
 
 ## Backlog (not started, not required for the demo)
 
+* Automated browser tests for the demo flow (for example Playwright driving `scripts/dev.py`).
+* Run the test suite against a real PostgreSQL service container in CI (today only the embedded server is exercised; a
+  `docker run` recipe is in SETUP.md but was not run here).
 * ULB-scoped visibility for engineers and supervisors (extend RLS with `ulb_id`).
 * Map view of manholes and alerts.
 * Simulated gas-sensor feed instead of typed readings.
