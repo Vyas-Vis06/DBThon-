@@ -76,7 +76,8 @@ def test_the_runtime_role_can_still_do_the_narrow_things_the_workflow_needs(app,
 
 
 def test_gate_and_incident_machinery_work_under_the_runtime_role(app, conn):
-    """authorise_entry and record_incident are SECURITY INVOKER: they must succeed with only ze_app's privileges."""
+    """authorise_entry runs with ze_app's own privileges; record_incident runs as the owner (0009) and checks the
+    recorder's role itself. Both must work end to end when called by the runtime role."""
     f = Factory(conn)
     s = f.gate_scenario(yesterday_ist())
     act_as(app, s["supervisor"], "SUPERVISOR")

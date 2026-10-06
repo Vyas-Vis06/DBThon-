@@ -2,7 +2,7 @@
 
 **Authoritative for:** the problem definition, interpretation, scope, roles, business rules and assumptions.
 If another document disagrees with this one, this one wins. Design and schema live in
-[ARCHITECTURE.md](ARCHITECTURE.md) and [DATABASE_DESIGN.md](DATABASE_DESIGN.md); progress lives in [ROADMAP.md](ROADMAP.md).
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) and [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md); progress lives in [ROADMAP.md](ROADMAP.md).
 
 Rule IDs (`BR-nn`) are stable. Code, SQL comments and tests cite them.
 
@@ -151,6 +151,7 @@ Marked `is_assumption = true` in `rule_parameter` and shown as such in the admin
 | A-07 | All ULBs are in India Standard Time (fixed +05:30). | True for the target; keeps the schema free of a tz database. |
 | A-08 | Suspension (not blacklisting) for disability incidents. | The proposal covers death only. |
 | A-09 | The gear catalogue in the seed data is illustrative. | The 2013 Rules' schedule must be checked against the Gazette. |
+| A-10 | Contractor risk score = 10 × deaths + 5 × disabilities + 3 × confirmed shadow entries + 1 × open alerts + 2 × overdue compensation cases (`v_contractor_risk`). | A ranking aid for reviewers, not a legal measure; the weights are illustrative and not in `rule_parameter`. |
 
 ## 7. Limitations and edge cases
 

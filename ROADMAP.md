@@ -125,7 +125,7 @@ seed is idempotent, models match the DB.
 
 ## Who can work on what (after M1)
 
-Interfaces: SQL objects and their signatures are in [DATABASE_DESIGN.md](DATABASE_DESIGN.md); HTTP in [API_SPEC.md](API_SPEC.md).
+Interfaces: SQL objects and their signatures are in [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md); HTTP in [API_SPEC.md](docs/API_SPEC.md).
 Agree on those two files and the streams do not collide.
 
 | Stream | Owns | Needs first | Conflicts to avoid |
