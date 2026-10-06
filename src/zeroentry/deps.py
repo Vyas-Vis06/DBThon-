@@ -107,6 +107,7 @@ def require(*roles: str):
             raise Forbidden(f"The {principal.role} role may not perform this action.")
         return principal
 
+    guard.roles = roles               # read by api_doc.py to document who may call each endpoint
     return guard
 
 

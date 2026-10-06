@@ -1,6 +1,6 @@
 # Schema reference (generated)
 
-> **Generated** by `python scripts/gen_schema_doc.py` from the migrated database catalogue. **Do not edit by hand**; a test
+> **Generated** by `python scripts/gen_docs.py` from the migrated database catalogue. **Do not edit by hand**; a test
 > fails when this file is out of date. The reasoning behind the design is in [DATABASE_DESIGN.md](DATABASE_DESIGN.md) and the
 > diagrams are in [ER_DIAGRAM.md](ER_DIAGRAM.md).
 

@@ -1,14 +1,14 @@
 """Generate docs/SCHEMA_REFERENCE.md from the migrated database's own catalogue.
 
 Hand-written schema documentation drifts; this cannot. tests/db/test_docs_in_sync.py regenerates it from a fresh migration
-and fails when the committed file differs, telling the contributor to run `python scripts/gen_schema_doc.py`.
+and fails when the committed file differs, telling the contributor to run `python scripts/gen_docs.py`.
 """
 
 import psycopg
 
 HEADER = """# Schema reference (generated)
 
-> **Generated** by `python scripts/gen_schema_doc.py` from the migrated database catalogue. **Do not edit by hand**; a test
+> **Generated** by `python scripts/gen_docs.py` from the migrated database catalogue. **Do not edit by hand**; a test
 > fails when this file is out of date. The reasoning behind the design is in [DATABASE_DESIGN.md](DATABASE_DESIGN.md) and the
 > diagrams are in [ER_DIAGRAM.md](ER_DIAGRAM.md).
 
