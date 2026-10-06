@@ -1,0 +1,56 @@
+# AGENTS.md: rules for every coding agent and teammate
+
+Applies to Codex, Claude Code, Cursor, Copilot and humans. Keep this file short; details live in the documents it points to.
+
+## Read first (in this order)
+
+1. [PROJECT_SPEC.md](PROJECT_SPEC.md): what the system must do. Business rules are `BR-nn`; assumptions are `A-nn`.
+2. [ROADMAP.md](ROADMAP.md): what is done, what is next, who can work on what.
+3. [docs/development/DEV_LOG.md](docs/development/DEV_LOG.md): latest state, known issues, next step.
+4. As the task needs: [ARCHITECTURE](docs/ARCHITECTURE.md) · [DATABASE_DESIGN](docs/DATABASE_DESIGN.md) ·
+   [ER_DIAGRAM](docs/ER_DIAGRAM.md) · [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) (generated) ·
+   [API_SPEC](docs/API_SPEC.md) (endpoint table generated) · [SECURITY](SECURITY.md) · [TESTING](docs/TESTING.md) ·
+   [decisions](docs/decisions/README.md).
+
+## Ground rules
+
+* **Inspect before editing.** Read the existing code and the matching test before changing behaviour. Prefer
+  extending what exists to adding a parallel mechanism.
+* **The database is the authority for business rules** (constraints, triggers, functions, views). The API is a
+  thin, authenticated layer. Do not re-implement a rule in Python that SQL already enforces.
+* **Migrations are append-only.** Never edit an applied migration. Add the next numbered file in
+  `database/migrations/sql/` plus its revision in `database/migrations/versions/` (`python scripts/db.py new <name>`).
+  Never call `create_all()`.
+* **SQL safety.** Parameterised queries or ORM only. No string-built SQL from user input.
+* **Secrets.** Never commit `.env`, passwords, tokens or data dumps. `.env.example` holds placeholders only.
+* **Authorisation is server-side.** Hiding a button is not a control. Every endpoint declares its roles with
+  `require(...)`; a test fails if a route has no guard.
+* **No fabricated results.** Do not mark a ROADMAP item `[x]` or state that tests pass unless you ran them.
+* **Generated docs are regenerated, not edited:** `python scripts/gen_docs.py` rewrites `docs/SCHEMA_REFERENCE.md`
+  and the endpoint table in `docs/API_SPEC.md`; tests fail when either is stale.
+
+## Definition of done (every change)
+
+1. Code and SQL written; the change is as small as the problem allows.
+2. Tests added or updated, and the **whole** suite run: `python -m pytest -n auto` (see [docs/TESTING.md](docs/TESTING.md)).
+3. Docs updated in the same change: schema → `docs/DATABASE_DESIGN.md` + `docs/ER_DIAGRAM.md` + regenerate;
+   endpoints → regenerate `docs/API_SPEC.md`; rules → `PROJECT_SPEC.md`; security → `SECURITY.md`;
+   progress → `ROADMAP.md` and `docs/development/DEV_LOG.md`.
+4. No new dependency unless nothing installed can do the job; record why in the PR.
+
+## Where things live
+
+| Path | Contents |
+|---|---|
+| `database/migrations/sql/` | The schema and all PL/pgSQL (numbered, forward-only) |
+| `database/seeds/`, `scripts/seed.py` | Deterministic demo data |
+| `database/queries/` | Annotated demonstration queries (joins, aggregates, division, anti-join, transactions) |
+| `src/zeroentry/` | API: `config`, `db`, `models`, `security`, `deps`, `errors`, `routers/`, `web/` (static UI) |
+| `tests/unit`, `tests/db`, `tests/api` | Pure unit tests · SQL behaviour tests · HTTP/role tests |
+| `scripts/` | `dev.py` (one-command run), `db.py` (migrate/bootstrap/new/reset), `seed.py`, `run_sql.py`, `gen_docs.py` |
+
+## Safe commands
+
+`python -m pytest -n auto` · `python scripts/dev.py` · `python scripts/gen_docs.py` · `git status`/`diff`.
+**Ask before:** `python scripts/db.py reset` (drops a database), `git push`, `git commit`, deleting files, anything
+that touches a database you did not create.
