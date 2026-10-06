@@ -51,6 +51,21 @@ def test_crew_cannot_be_removed_while_authorise_entry_is_deciding(db):
         assert check.execute(STANDBY_COUNT, (s["permit"],)).fetchone()["n"] == 1
 
 
+def test_an_entrant_added_while_authorise_entry_is_deciding_is_refused_once_it_commits(db):
+    """The foreign key alone made this insert WAIT (tests/db/test_entry_gate.py), but then it went through: an AUTHORISED
+    permit gained an entrant with no gear. The permit lock makes it re-read the status after the wait."""
+    s = _scenario(db)
+    with db.connect() as setup:
+        late = Factory(setup).worker(s["contractor"])
+    with db.connect(autocommit=False) as decider:
+        decider.execute("SELECT * FROM authorise_entry(%s, %s, %s)", (s["permit"], s["supervisor"], s["at"]))
+        thread, outcome = _in_background(
+            db, "INSERT INTO permit_crew (permit_id, worker_id, crew_role) VALUES (%s, %s, 'ENTRANT')", (s["permit"], late))
+        decider.commit()
+    thread.join(timeout=10)
+    assert outcome == {"sqlstate": "ZE003"}
+
+
 def test_a_raw_update_waits_for_an_uncommitted_crew_change_and_then_denies(db):
     s = _scenario(db)
     with db.connect(autocommit=False) as editor:

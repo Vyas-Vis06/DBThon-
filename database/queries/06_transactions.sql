@@ -57,6 +57,7 @@ BEGIN;
   SELECT 'AFTER FAILED CALL' AS moment, (SELECT count(*) FROM incident) AS incidents, (SELECT count(*) FROM compensation_case) AS cases;
 ROLLBACK;
 
--- Locking: authorise_entry() takes SELECT ... FOR UPDATE on the permit row. A concurrent session that tries to add crew, gear or a
--- reading to the same permit (each takes FOR KEY SHARE through its foreign key) waits until the authorising transaction ends,
--- so the proof can never be evaluated against a crew that is changing underneath it. tests/db/test_entry_gate.py proves it with two sessions.
+-- Locking: authorise_entry() takes SELECT ... FOR UPDATE on the permit row, and every guard on crew, gear, readings and entries
+-- first takes FOR SHARE on the same row (lock_permit(), migration 0010). A concurrent change to the evidence therefore waits
+-- until the decision commits, then re-reads the permit and is refused if it is no longer a DRAFT, so the proof can never be
+-- evaluated against a crew that is changing underneath it. tests/db/test_concurrency.py proves it with two sessions.

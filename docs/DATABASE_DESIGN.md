@@ -176,12 +176,13 @@ statuses ([API_SPEC.md](API_SPEC.md#errors)).
 * **The proof cannot change while it is being decided.** `authorise_entry` locks the permit (`FOR UPDATE`), and every guard on
   crew, gear, readings and entries first takes `FOR SHARE` on the same permit row (`lock_permit()`, migration `0010`). A change to
   the evidence and a change of the permit's status are therefore serialised: whoever comes second waits, re-reads the committed
-  state and is refused if it no longer holds. `tests/db/test_concurrency.py` reproduces the three races this closes (standby
-  removed during authorisation, a raw `UPDATE` racing an uncommitted crew change, an entry started while the permit closes);
-  all three committed before `0010`.
+  state and is refused if it no longer holds. `tests/db/test_concurrency.py` reproduces the four races this closes (standby
+  removed or an un-geared entrant added during authorisation, a raw `UPDATE` racing an uncommitted crew change, an entry
+  started while the permit closes); each one committed before `0010`.
 * Payments and hold releases lock their row (`FOR UPDATE`) so two clerks cannot overpay or double-release.
 * The overlap rule is a constraint, so two concurrent inserts of overlapping entries cannot both succeed.
-* [`database/queries/06_transactions.sql`](../database/queries/06_transactions.sql) demonstrates commit, rollback and a savepoint.
+* [`database/queries/06_transactions.sql`](../database/queries/06_transactions.sql) demonstrates commit and rollback on the real
+  consequence transaction, including a failure inside the procedure that leaves nothing behind.
 
 ## 9. Indexes
 
