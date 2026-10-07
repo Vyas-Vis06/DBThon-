@@ -15,6 +15,11 @@ India's law defines the offence as *missing safeguards*. ZeroEntry turns that in
 * **Consequences are one transaction.** A fatality opens a ₹30-lakh compensation case with a deadline, blacklists the contractor,
   stops the job's permits and holds its invoices, all or nothing.
 
+**Measured against conventional approaches** ([EVALUATION.md](docs/EVALUATION.md), reproducible with `python scripts/evaluate.py`):
+shadow-entry detection with 100 % precision and recall on labelled cases, against 40 % and 50 % for a naive anti-join; 18 of 18
+rule-breaking writes refused, against 1 of 18 when the same rules live in application code; an entry decision in 1.7 ms whether
+the history holds 1,000 or 100,000 complaints. How this answers the DBThon brief: [SUBMISSION.md](docs/SUBMISSION.md).
+
 ![The entry gate denying a permit, clause by clause](docs/img/entry-gate-denied.jpg)
 
 ## Quick start
@@ -43,13 +48,14 @@ python -m pytest -n auto               # about 500 tests in about 2 minutes; eac
 
 | Area | What | Verified by |
 |---|---|---|
-| Schema | 30 tables, 53 foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 10 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
+| Schema | 30 tables, 53 foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 11 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
 | Entry gate | relational division over gear and gas depths, state machine, freeze, 90-minute / daylight / overlap rules, race-free under concurrency | `tests/db/test_entry_gate.py`, `test_entry_rules.py`, `test_concurrency.py` |
 | Detection by absence | SE1 / SE2 anti-joins, grace window, idempotent scan, review with history, invoice holds with provenance | `tests/db/test_detection.py` (the six scenarios) |
 | Consequences | `record_incident()` procedure, compensation payments, holds | `tests/db/test_consequences.py` |
 | API | FastAPI, 100 operations, sessions, CSRF, lockout, six roles, row-level security | `tests/api/` (every endpoint × every role), `tests/db/test_rls.py` |
 | UI | no-build browser UI, strict CSP | walked through by hand; `tests/api/test_web.py` (no headless-browser tests) |
 | SQL showcase | joins, aggregates, search, division, anti-join, views, transactions, trigger refusals | `database/queries/`, each file run by `tests/db/test_demo_queries.py` |
+| Evaluation | accuracy, enforcement and latency against stated baselines, at up to 100,000 complaints | `python scripts/evaluate.py` ([EVALUATION.md](docs/EVALUATION.md)); counts asserted by `tests/db/test_evaluation.py` |
 
 CI runs the whole suite on Linux and Windows (Python 3.11 and 3.12) and macOS (Python 3.12).
 
@@ -61,13 +67,16 @@ CI runs the whole suite on Linux and Windows (Python 3.11 and 3.12) and macOS (P
 | `database/seeds/` · `database/queries/` | deterministic demo data · annotated demonstration queries |
 | `src/zeroentry/` | the API (`routers/`, `deps.py`, `errors.py`, ...) and the browser UI (`web/`) |
 | `tests/` | `unit/`, `db/` (SQL behaviour), `api/` (HTTP and roles) |
-| `scripts/` | `dev.py` run everything · `db.py` migrate/bootstrap/new/reset · `seed.py` · `run_sql.py` · `gen_docs.py` |
+| `database/evaluation/` | the baselines and synthetic history used only by `scripts/evaluate.py` |
+| `scripts/` | `dev.py` run everything · `db.py` migrate/bootstrap/new/reset · `seed.py` · `run_sql.py` · `gen_docs.py` · `evaluate.py` |
 | `docs/` | design, API, setup, testing, decisions, development log |
 
 ## Documentation
 
 | Read | For |
 |---|---|
+| [docs/SUBMISSION.md](docs/SUBMISSION.md) | **for the judges:** the DBThon brief's eight components, five-step novelty, 30-mark rubric, SDG and TRL, each mapped to evidence |
+| [docs/EVALUATION.md](docs/EVALUATION.md) · [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) | how ZeroEntry is measured against conventional approaches · the generated numbers |
 | [PROJECT_SPEC.md](PROJECT_SPEC.md) | the problem, roles, business rules (`BR-nn`) and assumptions (`A-nn`) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components and the life of a request |
 | [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) · [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md) | why the schema looks like this (3NF analysis, gate, detection, locking) · four ER diagrams |

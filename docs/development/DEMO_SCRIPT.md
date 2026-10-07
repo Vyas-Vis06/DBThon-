@@ -59,6 +59,16 @@ That edit is itself part of the story ("the law is data, and changing it is audi
     **Audit log**.
     > "The law is data, the gate is the database, and absence is a query."
 
+## If asked "how do you know it is better?" (30 s)
+
+Open [EVALUATION_RESULTS.md](../EVALUATION_RESULTS.md) (summary in [EVALUATION.md](../EVALUATION.md#results)): detection
+precision and recall against the naive anti-join, 18 of 18 invalid writes refused against 1 of 18 when the rules live in
+application code, and latency at 100,000 complaints. To show it is real, run a small version live (under a minute):
+
+```bash
+python scripts/evaluate.py --sizes 1000 --per-class 5 --out -
+```
+
 ## Backup: the same story in SQL only
 
 ```bash

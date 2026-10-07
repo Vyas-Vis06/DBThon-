@@ -148,6 +148,12 @@ never duplicates, a dismissed alert is never re-opened, and **nothing is ever cl
 holds the contractor's unpaid invoices on that complaint (`invoice_hold` with `alert_id`); dismissing it releases exactly those
 holds, never an incident's.
 
+**Cost.** The grace window is read once per statement: the one-row CTE `g` is `MATERIALIZED` (migration `0011`). Before that,
+PostgreSQL inlined it and called `rule_num()` once per joined row inside the anti-join filters; at 100,000 resolved complaints
+the scan ran 12x slower and the candidate query touched 2.7x more buffers, for identical results. The scan re-evaluates every resolved
+complaint each time it runs (a full, idempotent pass; measured in [EVALUATION.md](EVALUATION.md)); an incremental scan driven by
+a change queue is the upgrade path if volumes ever make that pass too slow.
+
 ## 7. Programmable objects
 
 | Object | Kind | Purpose (rule) |

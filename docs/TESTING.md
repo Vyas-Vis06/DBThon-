@@ -38,6 +38,7 @@ RLS context on a `ze_app` connection).
 |---|---|---|
 | Unit (no database) | `tests/unit/` | password and token rules, throttle, configuration validation, error mapping, URL building, docs links and rule IDs |
 | Database behaviour | `tests/db/` | constraints reject bad rows; **every gate clause has a pass and a fail case**; the gate cannot be bypassed (raw `UPDATE`, raw `INSERT`, concurrent sessions); entry rules (90 minutes, daylight, overlap, window, role); waivers; `record_incident` is atomic (forced failure leaves nothing); detection scenarios; holds; privileges of `ze_app`; row-level security per role; the seed and every demonstration query run; docs match the database |
+| Evaluation | `tests/db/test_evaluation.py` | `scripts/evaluate.py` still runs, and its claims hold at a tiny scale: detection exact on every labelled class while the naive anti-join is not; 18 of 18 invalid writes refused while the rules-in-app-code baseline refuses 1; the history generator goes through the real gate; the detection views keep the parameter CTE materialised (migration `0011`). Counts only, never timings |
 | API | `tests/api/` | sessions, lockout, throttle, CSRF, cookie flags; **every endpoint probed as every role** (`test_rbac.py`, 176 cases); end-to-end workflows; scoping for contractors and workers; validation errors; UI files served with a strict CSP and no markup built from data; the endpoint table matches the code |
 
 ## The six detection scenarios (the brief's checklist)

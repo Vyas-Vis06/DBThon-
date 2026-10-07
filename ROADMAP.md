@@ -6,9 +6,11 @@ Requirements live in [PROJECT_SPEC.md](PROJECT_SPEC.md); history of decisions in
 Legend: `[ ]` not started · `[-]` in progress · `[x]` implemented **and verified by a test or command named in the row**.
 A task is never `[x]` on "it compiles".
 
-## Current state (2026-10-07): read this first
+## Current state (2026-10-07, evening): read this first
 
-M0-M5 are implemented. Everything marked `[x]` is verified by the test suite (run on Linux, Windows and macOS in CI) or by the command
+M0-M6 are implemented. M6 answers the DBThon 2026 brief's evaluation: a measured comparison against stated baselines
+([docs/EVALUATION.md](docs/EVALUATION.md)), a performance fix that comparison found (migration `0011`), and a map of the
+brief and its 30-mark rubric to the evidence ([docs/SUBMISSION.md](docs/SUBMISSION.md)). M0-M5 are as before. Everything marked `[x]` is verified by the test suite (run on Linux, Windows and macOS in CI) or by the command
 named in the row. The only `[-]` rows are the UI screens: built and walked through by hand in a browser (the demo flow again on
 2026-10-07), but **not covered by automated browser tests**.
 
@@ -16,8 +18,8 @@ Changed in the second session: the full documentation set and its drift tests; a
 fixed (M2-08); Linux/macOS support for the embedded PostgreSQL (CI caught it); tests for `scripts/db.py`; the repository published
 to GitHub with CI.
 
-Next step: pick from the backlog below (automated browser tests first), and verify the legal references against the Gazette
-before presenting. Details: [DEV_LOG.md](docs/development/DEV_LOG.md).
+Next step: M6-05 (a person verifies the statistics and legal references before presenting), then the backlog below
+(automated browser tests first). Details: [DEV_LOG.md](docs/development/DEV_LOG.md).
 
 ## Milestone map
 
@@ -30,6 +32,7 @@ flowchart LR
   M2 --> M4
   M3 --> M4
   M4 --> M5[M5 UI + demo + acceptance]
+  M5 --> M6[M6 DBThon evaluation + submission]
 ```
 
 Rule of thumb: **each milestone must run and pass its tests before the next starts.** Docs are updated in the same
@@ -123,6 +126,19 @@ seed is idempotent, models match the DB.
 | M5-07 | Final acceptance pass against `docs/development/ACCEPTANCE_CHECKLIST.md` | [x] |
 | M5-08 | CI workflow (`.github/workflows/ci.yml`), green on GitHub Actions | [x] |
 
+## M6 DBThon 2026 evaluation and submission (needs M5)
+
+The brief is [docs/proposal/DBTHON2026_Challenge.pdf](docs/proposal/DBTHON2026_Challenge.pdf); what answers each part is in
+[docs/SUBMISSION.md](docs/SUBMISSION.md).
+
+| ID | Task | Status | Verified by |
+|---|---|---|---|
+| M6-01 | Evaluation harness `scripts/evaluate.py` with baselines in `database/evaluation/` (naive anti-join; rules in app code) | [x] | `tests/db/test_evaluation.py` (counts at a tiny scale, every CI run) |
+| M6-02 | Full run at 1k, 10k and 100k complaints; results generated, method and limits written | [x] | [EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) (2026-10-07), [EVALUATION.md](docs/EVALUATION.md) |
+| M6-03 | Fix found by the evaluation: detection views read the grace parameter once per statement (migration `0011`) | [x] | `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`; before/after columns in the results |
+| M6-04 | Submission guide: the brief's eight components, five-step novelty, rubric map, SDG targets (checked on sdgs.un.org), TRL | [x] | [SUBMISSION.md](docs/SUBMISSION.md); links checked by `tests/unit/test_docs.py` |
+| M6-05 | Statistics and legal references re-verified against their sources before presenting | [ ] | a person, not a test |
+
 ---
 
 ## Who can work on what (after M1)
@@ -148,3 +164,5 @@ Agree on those two files and the streams do not collide.
 * Tamil-language UI strings.
 * Signed permit PDF export.
 * Rest-interval rule once the SOP states a length (assumption A-04).
+* Incremental absence scan fed by a change queue, only if volumes outgrow the full pass (E3b in
+  [EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md)).
