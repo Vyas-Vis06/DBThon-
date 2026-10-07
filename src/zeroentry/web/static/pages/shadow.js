@@ -38,7 +38,7 @@ export default async function (root) {
           { name: 'note', label: 'Written reason (10+ characters)', type: 'textarea', required: true, wide: true, attrs: { minlength: 10 } },
         ], async (v) => { await api('POST', `/detections/alerts/${a.alert_id}/review`, v); toast('Decision recorded.'); location.reload(); }, { submit: 'Record decision' })]
         : open ? h('p', { class: 'muted small' }, 'Only an engineer or administrator can decide an alert.') : null));
-    detail.scrollIntoView({ behavior: 'smooth' });
+    detail.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
 
   const alertsTab = async (box) => {

@@ -137,12 +137,21 @@ export function form(fields, onSubmit, { submit = 'Save', danger = false } = {})
   return el;
 }
 
+let tabSetCount = 0;
+
 export function tabs(items, initial) {
-  const bar = h('div', { class: 'tabs', role: 'tablist' });
-  const panel = h('div', { role: 'tabpanel' });
+  const setId = `tabs-${++tabSetCount}`;
+  const panelId = `${setId}-panel`;
+  const bar = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Sections' });
+  const panel = h('div', { id: panelId, role: 'tabpanel', tabindex: '0' });
   const buttons = {};
   const select = async (id) => {
-    for (const [k, b] of Object.entries(buttons)) b.setAttribute('aria-selected', String(k === id));
+    for (const [k, b] of Object.entries(buttons)) {
+      const selected = k === id;
+      b.setAttribute('aria-selected', String(selected));
+      b.setAttribute('tabindex', selected ? '0' : '-1');
+    }
+    panel.setAttribute('aria-labelledby', buttons[id].id);
     panel.replaceChildren(h('p', { class: 'muted' }, 'Loading…'));
     const item = items.find((i) => i.id === id);
     const content = h('div');
@@ -150,8 +159,28 @@ export function tabs(items, initial) {
     panel.replaceChildren(content);
     history.replaceState(null, '', '#' + id);
   };
+  const move = (from, direction) => {
+    const index = items.findIndex((item) => item.id === from);
+    const next = direction === 'home' ? 0 : direction === 'end' ? items.length - 1 : (index + direction + items.length) % items.length;
+    buttons[items[next].id].focus();
+    select(items[next].id);
+  };
   for (const item of items) {
-    buttons[item.id] = h('button', { type: 'button', role: 'tab', 'aria-selected': 'false', onclick: () => select(item.id) }, item.label);
+    buttons[item.id] = h('button', {
+      id: `${setId}-${item.id}`,
+      type: 'button',
+      role: 'tab',
+      tabindex: '-1',
+      'aria-controls': panelId,
+      'aria-selected': 'false',
+      onclick: () => select(item.id),
+      onkeydown: (event) => {
+        const direction = { ArrowLeft: -1, ArrowRight: 1, Home: 'home', End: 'end' }[event.key];
+        if (direction === undefined) return;
+        event.preventDefault();
+        move(item.id, direction);
+      },
+    }, item.label);
     bar.append(buttons[item.id]);
   }
   const start = items.some((i) => i.id === location.hash.slice(1)) ? location.hash.slice(1) : (initial || items[0].id);
@@ -230,7 +259,13 @@ async function boot() {
   main.replaceChildren();
   try { await module.default(main, { user: state.user, params: new URLSearchParams(location.search) }); }
   catch (e) { main.append(h('p', { class: 'banner bad' }, e.message || String(e))); }
-  main.focus();
+  const heading = main.querySelector('h1');
+  if (heading) {
+    heading.setAttribute('tabindex', '-1');
+    heading.focus();
+  } else {
+    main.focus();
+  }
 }
 
 window.addEventListener('unhandledrejection', (ev) => { toast(ev.reason?.message || 'Something went wrong.', 'bad'); });
