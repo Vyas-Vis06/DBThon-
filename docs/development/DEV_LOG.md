@@ -10,7 +10,7 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 35 tables, new scoped read endpoints and presentation screens. Original migrations 0001–0011 remain unchanged.
 Initial audit version, before the concurrent M6 integration: **568 passed in 30.21 seconds**, macOS, Python 3.12.11,
 embedded PostgreSQL 16.2. All six CI jobs passed on `28b8bee`, including PostgreSQL service and all five OS/Python jobs.
-Integrated validation before the final upstream invoice-measurement refresh: **574 passed in 34.34 seconds**.
+Final integrated local validation: **574 passed in 30.70 seconds**, including upstream late-evidence invoice measurement.
 Branch CI is configured for the original five OS/Python jobs and a separate PostgreSQL 16 service; see Actions for its
 current result. The release is for review, not an automatic merge or a production safety certification.
 
@@ -27,7 +27,7 @@ current result. The release is for review, not an automatic merge or a productio
   that a failed scan cannot roll back an already committed stop.
 * Built and separately installed wheel passes shell/JS/CSS smoke checks. No new application dependency added.
 * Synthetic SE1 evaluation at 1k/10k/100k complaints, seven query samples per scale, raw plans/counts/confusion matrices
-  and source hashes. The saved 100k run measured 138.31 ms p50 and 140.57 ms p95 for SE1 and 2435.54 ms for first scan.
+  and source hashes. The saved 100k run measured 140.88 ms p50 and 142.18 ms p95 for SE1 and 2460.04 ms for first scan.
   Six synthetic labels classify as expected; this is not field accuracy or an equal-task speedup claim.
 * Fresh isolated local demo: expected five initial alerts; UI denial with five reasons; completed crew/gear through API;
   simulator-authorized safe readings; an open entry; low-oxygen stop; browser-recorded exit after stop; three retained
@@ -43,10 +43,14 @@ The main `scripts/evaluate.py` is retained and adapted to truthful historical re
 probe; `scripts/evaluate_temporal.py` is the supplementary SE1 finalization experiment. The unmaterialized comparison
 retains final temporal semantics. Runtime draft authorization now also requires READ COMMITTED to prevent stale worker
 credentials in repeatable-read snapshots, with regressions for function and raw UPDATE. Source provenance includes the
-official 20 January 2026 compensation clarification. Both integrated evaluators completed on committed `f819d5f`. Main M6 measured a 1.7 ms median decision and a
-256.3 ms median persisted scan at 100,001 complaints. Its separate history workload differs from the supplementary
-100,000-complaint temporal workload. New upstream `72dc6d1` also adds an explicit held-invoice count for late paperwork;
-this is retained, with final validation recorded in the review handoff.
+official 20 January 2026 compensation clarification. Latest upstream `72dc6d1` is also integrated, including its explicit held-invoice measurement for late paperwork.
+The final M6 run on committed `7893c09` measured a 1.7 ms median decision and a 254.9 ms median persisted scan at
+100,001 complaints; 20/20 late-evidence invoices remained held and E2 refused 18/18 probes. The supplementary run on
+`6c55b37` uses a different, evenly interleaved temporal workload; all 15 source fingerprints match the final SQL/runner.
+The final isolated demo `.pgdata/presentation-final` retained an exit after the unsafe stop, three safety events and
+unchanged original decision bytes after a policy revision. Only this synthetic rehearsal widens the daylight proxy to
+24:00 for the evening presentation. The default migration remains 06:00–18:00 IST. UI wording now refers to configured
+checks over recorded evidence. Final branch CI is linked from PR #1; no automatic merge is authorized.
 
 ### Handoff
 

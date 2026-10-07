@@ -4,9 +4,9 @@
 
 | Run | |
 |---|---|
-| Date | 2026-10-07 12:32 UTC |
+| Date | 2026-10-07 12:48 UTC |
 | Command | `python scripts/evaluate.py` |
-| Commit | `f819d5f` (plus uncommitted changes, if any) |
+| Commit | `7893c09` (plus uncommitted changes, if any) |
 | Machine | Darwin 27.0.0, 10 logical CPUs, arm64 |
 | Python / PostgreSQL | 3.12.11 / 16.2 (embedded, default settings) |
 
@@ -32,7 +32,7 @@ ZeroEntry = alerts persisted by `scan_shadow_entries()`; naive = the proposal's 
 | `machine_failed_only` | the only machine deployment FAILED | 20 | yes | 20 | 20 |
 | `entrant_not_logged` | lawful permit closed, but one entrant has no entry log | 20 | yes | 20 | 0 |
 
-**Late paperwork** (20 invoiced complaints resolved with no evidence; a CLEARED machine log is recorded 30 h later, after the first scan): ZeroEntry kept **20** for human review (`EVIDENCE_RECEIVED`) with **20** of their invoices still held; the naive query silently dropped **20** from its list and holds nothing.
+**Late paperwork** (20 invoiced complaints resolved with no evidence; a CLEARED machine log is recorded 30 h later, after the first scan): ZeroEntry kept **20** for human review (`EVIDENCE_RECEIVED`) with **20** of their invoices still held; the naive query silently dropped **20** from its list and has no hold mechanism.
 
 ## E2 Enforcement (one invalid write per rule, any client)
 
@@ -49,7 +49,7 @@ Baseline = the same schema and constraints with every rule trigger disabled (`da
 | BR-07 | Authorise after the latest BOTTOM reading showed H2S at 25 ppm | refused, `ZE001`: Entry denied. Unmet legal clauses: - BOTTOM atmosphere tested recently, by a calibrated detector, within limits: H2S 25.00 ppm is not below  | **accepted** |
 | BR-08 | Insert a permit that is born AUTHORISED | refused, `ZE003`: A permit is created as DRAFT; AUTHORISED is reachable only through the clause gate | **accepted** |
 | BR-09 | Add an un-geared entrant to an authorised permit | refused, `ZE003`: Crew and gear are frozen once a permit is AUTHORISED (cancel and re-issue instead) | **accepted** |
-| BR-10 | Start a new entry before the required 30-minute rest after a 90-minute stretch | refused, `ZE002`: This worker must rest for 30 minutes after a 90-minute stretch; the next stretch is allowed after 2026-10-07 18:31 IST | **accepted** |
+| BR-10 | Start a new entry before the required 30-minute rest after a 90-minute stretch | refused, `ZE002`: This worker must rest for 30 minutes after a 90-minute stretch; the next stretch is allowed after 2026-10-07 18:46 IST | **accepted** |
 | BR-11 | Re-open a CLOSED permit | refused, `ZE003`: A permit cannot change from CLOSED to AUTHORISED | **accepted** |
 | BR-12 | Record a gas reading from a detector whose calibration had lapsed | refused, `ZE002`: Detector GD-T-00598 calibration expired on 2020-01-01: a reading taken on 2026-09-01 is refused | **accepted** |
 | BR-22 | Give a new job to a blacklisted contractor | refused, `ZE003`: Contractor Contractor 600 is BLACKLISTED and cannot be assigned jobs | **accepted** |
@@ -71,14 +71,14 @@ Every measurement is rolled back, so each repetition does the same work. Times i
 
 | Complaints | Permits | Gas readings | Decision median | Decision p95 | Without gate indexes (median) | Clause check buffers |
 |---|---|---|---|---|---|---|
-| 1,001 | 51 | 153 | 1.8 | 1.9 | 1.7 | 41 |
+| 1,001 | 51 | 153 | 1.8 | 1.8 | 1.7 | 41 |
 | 10,001 | 501 | 1,503 | 1.7 | 1.8 | 2.4 | 50 |
-| 100,001 | 5,001 | 15,003 | 1.7 | 2.0 | 9.9 | 50 |
+| 100,001 | 5,001 | 15,003 | 1.7 | 2.9 | 9.9 | 50 |
 
 ### E3b Detection by absence (`scan_shadow_entries()` and the candidate query)
 
 | Complaints | Scan median / p95 | Scan before 0011 (median) | Candidate query ms / buffers | Before 0011 | Without scan indexes | Naive query ms / buffers | Naive flagged | ZeroEntry candidates |
 |---|---|---|---|---|---|---|---|---|
-| 1,001 | 3.1 / 3.2 | 8.1 | 0.9 / 568 | 2.5 / 1,548 | 2.7 / 1,120 | 0.3 / 50 | 48 | 19 |
-| 10,001 | 25.0 / 25.3 | 78.7 | 8.0 / 6,737 | 24.8 / 16,243 | 186.1 / 86,657 | 2.5 / 490 | 476 | 190 |
-| 100,001 | 256.3 / 278.3 | 907.8 | 85.1 / 70,689 | 260.0 / 165,730 | 18,361.5 / 8,413,671 | 19.4 / 17,964 | 4,751 | 1,900 |
+| 1,001 | 3.1 / 3.2 | 8.2 | 0.9 / 568 | 2.5 / 1,548 | 2.6 / 1,120 | 0.3 / 50 | 48 | 19 |
+| 10,001 | 25.2 / 25.3 | 79.5 | 7.6 / 6,737 | 24.1 / 16,243 | 186.9 / 86,657 | 2.5 / 490 | 476 | 190 |
+| 100,001 | 254.9 / 595.6 | 848.1 | 88.7 / 70,689 | 259.8 / 165,730 | 18,228.8 / 8,413,671 | 18.6 / 17,964 | 4,751 | 1,900 |
