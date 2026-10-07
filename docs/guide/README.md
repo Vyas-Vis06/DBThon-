@@ -4,6 +4,9 @@ In reading order:
 
 | Read | If you want |
 |---|---|
+| [PITCH_SCRIPT.md](../PITCH_SCRIPT.md) | the problem-first spoken pitch, 90-second fallback, and optional database continuation |
+| [PITCH_CUE_CARD.md](../PITCH_CUE_CARD.md) | six story beats, prepared screens, technical transition and closing line |
+| [DATABASE_HANDBOOK.md](../DATABASE_HANDBOOK.md) · [TABLE_GUIDE.md](../TABLE_GUIDE.md) | a database walkthrough and all 35 tables explained, with keys and relationships |
 | [DEMO_COMMANDS.md](DEMO_COMMANDS.md) | **just the commands**, terminal by terminal, ready to copy and paste |
 | **this page** | to run the whole product with one command and try it live (10 minutes) |
 | [ZeroEntry_Conditions.pptx](ZeroEntry_Conditions.pptx) | the slide deck: the 19 showcase conditions and how the database reacts to each (speaker notes included) |

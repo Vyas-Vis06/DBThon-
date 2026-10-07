@@ -1,0 +1,57 @@
+%% ZeroEntry runtime and judge-facing commands, based on run.py, scripts/dev.py, main.py and maintenance.py.
+flowchart LR
+  User["Operator or reviewer"] --> Browser["Browser"]
+  Browser --> UI["Same-origin UI<br/>shell.html + page ES modules"]
+  UI -->|"Cookie + CSRF + Origin"| Auth
+  Client["Script or curl"] -->|"Bearer token"| Auth
+
+  subgraph LocalRun["Local run: python run.py"]
+    Entry["run.py<br/>creates/reuses .venv"] -->|"no command"| Dev["scripts/dev.py"]
+    Dev -->|"starts and keeps data"| DevPG["Embedded PostgreSQL 16<br/>.pgdata/cluster"]
+    Dev -->|"Alembic 0001–0014"| DevPG
+    Dev -->|"first run unless --no-seed"| Seed["Demo seed and initial absence scan"]
+    Seed --> DevPG
+    Dev -->|"serves UI and API"| App
+  end
+
+  subgraph Service["Application service"]
+    App["FastAPI app<br/>src/zeroentry/main.py"] --> Auth["deps.py<br/>session lookup, CSRF, require(roles),<br/>transaction-local identity and scope"]
+    Auth --> Routers["Thin routers<br/>validate input and call SQL"]
+    Routers --> Models["SQLAlchemy mappings<br/>to SQL-defined tables and views"]
+    Errors["errors.py<br/>database SQLSTATE to HTTP response"]
+  end
+
+  subgraph Database["PostgreSQL data and rules"]
+    AppRole["ze_app runtime role"] --> RLS["Row-level security<br/>uses app.* transaction settings"]
+    Models --> AppRole
+    RLS --> Tables["35 application tables<br/>FKs, CHECKs, UNIQUE and exclusion constraints"]
+    Tables --> Rules["Triggers, functions, procedures and views<br/>entry gate, safety, detection and financial effects"]
+    Rules -->|"refusal SQLSTATE"| Errors
+    Owner["Migration / seed owner role"] --> Tables
+  end
+  Rules -->|"successful result"| Commit["deps.py: COMMIT before success response"]
+  Commit --> Browser
+  Commit --> Client
+  Errors -->|"rollback and error response"| Browser
+  Errors --> Client
+
+  subgraph Maintenance["Periodic database-owned work"]
+    Lifespan["FastAPI lifespan<br/>default interval: 30 seconds"] --> Sweep["sweep_permit_safety()"]
+    Lifespan --> Scan["scan_shadow_entries(now())"]
+    Sweep -->|"separate transaction + advisory lock"| Rules
+    Scan -->|"separate transaction + advisory lock"| Rules
+  end
+
+  subgraph RealServer["Real-server option"]
+    Bootstrap["scripts/db.py bootstrap<br/>migration owner + ze_app login"] --> ExternalPG["Existing PostgreSQL 15+"]
+    ExternalPG -->|"DATABASE_URL as ze_app"| App
+    Uvicorn["uvicorn --factory<br/>zeroentry.main:create_app"] --> App
+  end
+
+  subgraph IsolatedTools["Isolated verification and demo commands"]
+    Entry -->|"test"| TestCmd["pytest<br/>fresh database copies"]
+    TestCmd --> TestPG["Embedded test PostgreSQL<br/>separate from .pgdata"]
+    Entry -->|"showcase"| Show["scripts/showcase.py<br/>same migrations + demo seed"]
+    Show --> ShowPG["Temporary PostgreSQL 16<br/>one database copy per condition"]
+    ShowPG --> Parallel["19 conditions run concurrently<br/>print action, DB reaction and state changes"]
+  end

@@ -6,6 +6,10 @@ alternatives in [decisions/](decisions/README.md).
 
 ## The shape in one picture
 
+The full launcher, live service, database, maintenance and isolated showcase/test paths are in the
+[runtime architecture diagram](diagrams/zeroentry-architecture.mmd); [docs/diagrams/README.md](diagrams/README.md) explains how to
+render the standalone Mermaid source.
+
 ```mermaid
 flowchart LR
   subgraph Browser
@@ -19,7 +23,7 @@ flowchart LR
     R["routers/<br/>thin: validate, call SQL"]
     E["errors.py<br/>SQLSTATE -> HTTP"]
   end
-  subgraph PG["PostgreSQL 16"]
+  subgraph PG["PostgreSQL (embedded 16; external 15+)"]
     S["tables + constraints<br/>(35 tables)"]
     T["triggers and functions<br/>the gate, consequences, detection"]
     P["row-level security<br/>(app.* settings per transaction)"]
@@ -101,6 +105,20 @@ New open entries always check current clauses, worker rest and the server clock.
 permits. The periodic sweep covers changes due to time alone, including stale readings, validity expiry and overstays.
 Record exits on an already stopped permit and retain violation events. An API process or database outage delays sweeps;
 this mechanism has no independent instrument or physical access-control channel.
+
+## Launch and judge workflows
+
+`python run.py` is the repository entry point. On first use it creates `.venv` and installs the project dependencies, then
+starts `scripts/dev.py`. The local runtime starts embedded PostgreSQL 16 in `.pgdata/`, applies Alembic migrations through
+`0014`, loads the deterministic seed on an empty database unless `--no-seed` is supplied, runs an initial absence scan, and
+serves the FastAPI app and same-origin UI. The database directory persists across restarts; pass `--data-dir` to isolate a
+second local instance. The root guide documents `python run.py sql` for the seven annotated queries, `python run.py psql` for
+the owner console, and `python run.py psql --app` for the application role.
+
+`python run.py showcase` uses a temporary embedded PostgreSQL cluster, applies the same migrations and demo seed, creates one
+database copy per condition, and runs 19 database conditions concurrently. It prints the action, PostgreSQL's reaction and
+the changed state, then removes the temporary cluster; it operates independently of `.pgdata/`, so the live demo can continue
+running. `python run.py test` routes to pytest and the isolated database fixtures described in [TESTING.md](TESTING.md).
 
 ## Runtime topologies
 

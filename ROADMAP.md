@@ -6,7 +6,20 @@ Requirements live in [PROJECT_SPEC.md](PROJECT_SPEC.md); history of decisions in
 Legend: `[ ]` not started · `[-]` in progress · `[x]` implemented **and verified by a test or command named in the row**.
 A task is never `[x]` on "it compiles".
 
-## Current state (2026-10-07, evening): read this first
+## Documentation and pitch refresh (2026-10-08)
+
+The latest upstream `main` (`1e5bd79`) is integrated locally, including the operations-console UI, one-command launcher,
+and 19-condition showcase. The README now introduces the problem, product workflow, architecture and database evidence.
+[PITCH_SCRIPT.md](docs/PITCH_SCRIPT.md) provides the spoken opening, main pitch, short fallback and database continuation;
+[DATABASE_HANDBOOK.md](docs/DATABASE_HANDBOOK.md), [TABLE_GUIDE.md](docs/TABLE_GUIDE.md), and
+[standalone diagrams](docs/diagrams/README.md) make the database easier to review and present.
+Local validation: `python -m pytest -n auto` on Python 3.12.11/macOS, **575 passed**.
+The current UI screenshots are captured from an isolated seeded application; the
+[pitch cue card](docs/PITCH_CUE_CARD.md) and [rendered SVG diagrams](docs/diagrams/README.md#ready-to-use-exports)
+support rehearsal and presentation. A second full suite after the screenshot/export work passed **575 tests**.
+This refresh adds documentation; UI browser automation and field/pilot validation remain backlog work.
+
+## Foundation and audit state (2026-10-07, evening)
 
 M0-M5 form the original implemented foundation. The audit hardening below adds three forward migrations (0012–0014),
 bringing the application to 35 tables. UI screens remain manually verified, without an automated browser suite.

@@ -5,19 +5,26 @@ catalogue in [SCHEMA_REFERENCE.md](SCHEMA_REFERENCE.md); the pictures are in [ER
 in [`database/migrations/sql/`](../database/migrations/sql/). Business-rule IDs (`BR-nn`) and assumptions (`A-nn`) refer to
 [PROJECT_SPEC.md](../PROJECT_SPEC.md). A test fails if a table is added without being described here.
 
+For an introductory walkthrough, start with [DATABASE_HANDBOOK.md](DATABASE_HANDBOOK.md). The
+[TABLE_GUIDE.md](TABLE_GUIDE.md) explains all 35 tables by purpose, keys, relationships and lifecycle; the
+[standalone diagram sources](diagrams/README.md) can be reused in a presentation. The
+[pitch script](PITCH_SCRIPT.md) moves from the problem into these database mechanisms.
+
 ## 1. Principles
 
 1. **The database is the authority.** Every rule that can be stated over stored data is enforced by PostgreSQL (keys, `CHECK`,
-   exclusion constraint, triggers, functions, row-level security), so no client (the API, `psql`, a future mobile app) can
-   bypass it. The API is a thin authenticated layer.
+   exclusion constraint, triggers, functions, row-level security), so ordinary writers through the API, `psql` or a future
+   mobile app face the same stored-state guards. A privileged database owner remains trusted and can alter those controls.
+   The API is a thin authenticated layer.
 2. **Default deny.** An entry permit becomes `AUTHORISED` only when one function proves every clause; the same function guards
    the `UPDATE` itself (§5).
 3. **Absence is a query.** "An entry nobody recorded" is found as the set difference between an explicit *expected population*
    and the records it should have left (§6).
 4. **The law is data.** Thresholds, amounts, grace periods, legal clause titles and the gear catalogue are rows
    (`rule_parameter`, `legal_clause`, `gear_item`, `resolution_type`, `detection_rule`); changing one is audited.
-5. **Evidence is append-only.** Gas readings, entry logs, waivers, incidents, alert history and the audit log cannot be
-   rewritten or deleted.
+5. **Evidence history is retained.** Gas readings, waivers, incidents, alert history and the audit log cannot be rewritten
+   or deleted. Entry starts are immutable; recording an exit closes the reported interval, including after a safety stop,
+   while violations remain in immutable safety events.
 
 ## 2. Entities and relationships
 
@@ -28,7 +35,8 @@ Thirty-five tables, grouped by purpose. Core entities and their main relationshi
 | Identity and access | `role`, `app_user`, `user_session` | role 1:N app_user; app_user 1:N user_session; app_user 0..1 : 0..1 worker (a WORKER login) |
 | Organisations and people | `ulb`, `contractor`, `worker` | contractor 1:N worker |
 | Assets and work | `manhole`, `machine`, `complaint`, `resolution_type`, `job`, `machine_deployment`, `mechanisation_waiver` | ulb 1:N manhole; manhole 1:N complaint; complaint 1:N job; contractor 1:N job; job 1:N machine_deployment; job 1:0..1 mechanisation_waiver |
-| The entry gate | `entry_permit`, `permit_crew`, `gear_item`, `gear_issue`, `gas_detector`, `gas_reading`, `entry_log`, `legal_clause`, `rule_parameter` | job 1:N entry_permit; **entry_permit M:N worker through `permit_crew`** (with the attribute `crew_role`); permit_crew 1:N gear_issue; permit_crew 1:N entry_log; entry_permit 1:N gas_reading |
+| The entry gate and safety evidence | `entry_permit`, `permit_crew`, `gear_item`, `gear_issue`, `gas_detector`, `gas_reading`, `entry_log`, `permit_safety_event`, `permit_authorization_decision` | job 1:N entry_permit; **entry_permit M:N worker through `permit_crew`** (with the attribute `crew_role`); permit_crew 1:N gear_issue and entry_log; entry_permit 1:N gas_reading and safety events; entry_permit 1:0..1 authorization decision |
+| Policy and provenance | `legal_clause`, `rule_parameter`, `policy_source`, `legal_clause_source`, `rule_parameter_history` | legal_clause M:N policy_source through legal_clause_source; policy_source 1:N current parameters and revisions; rule_parameter 1:N history |
 | Consequences | `incident`, `compensation_case`, `invoice`, `invoice_hold` | incident 1:0..1 compensation_case; job 1:N invoice; invoice 1:N invoice_hold; each hold has exactly one source (an alert **or** an incident) |
 | Detection by absence | `detection_rule`, `shadow_entry_alert`, `shadow_entry_alert_event` | complaint 1:N alert (at most one per rule); alert 1:N event |
 | Audit | `audit_log` | none, on purpose: history must outlive the rows and users it describes |
@@ -60,8 +68,10 @@ someone who is not on the crew, or an entry logged for them.
 is a `tstzrange`: one atomic value of a range type (PostgreSQL compares and indexes it as a unit), chosen so the overlap rule
 is a constraint instead of a trigger.
 
-**2NF.** The only tables with composite *primary* keys are `permit_crew (permit_id, worker_id) → crew_role`, where the role
-depends on the whole key (a worker's role differs per permit). Tables whose natural key is composite use a surrogate key plus a
+**2NF.** `permit_crew (permit_id, worker_id) → crew_role` uses a composite primary key: the role depends on the whole key
+(a worker's role differs per permit). The other composite-primary-key junction is
+`legal_clause_source (clause_code, source_code) → sort_order`, which orders a source within its clause's citation list.
+Tables whose natural key is composite can also use a surrogate key plus a
 `UNIQUE` on the natural key, for example `gear_issue`: `issue_id → (permit_id, worker_id, gear_code, serial_no, issued_by, issued_at)`
 with `UNIQUE (permit_id, worker_id, gear_code)`; `serial_no` depends on the whole natural key, not on part of it.
 
@@ -125,9 +135,11 @@ WHERE c.status = 'RESOLVED'
   AND NOT EXISTS (authorised permit CLOSED within the grace window with an entry logged within it)
 ```
 
-`SE2` (`v_shadow_se2`) does the same per entrant of every closed permit. Evidence counts only if it was **recorded** (server
-clock, `recorded_at`) within the grace window (`shadow_grace_hours`, A-06) after the anchor event, so candidates are a pure
-function of the data and never race the scan schedule. Resolutions with `requires_evidence = false` are intentionally absent
+`SE2` (`v_shadow_se2`) does the same per entrant of every closed permit. Evidence must meet its source-specific timing checks
+within the grace window (`shadow_grace_hours`, A-06) after the anchor event. In particular, machine evidence uses the
+server-assigned final-outcome receipt `outcome_recorded_at`, rather than the earlier deployment-row receipt; entry evidence
+uses its server receipt `recorded_at`. A late finalization remains late even before the first scan.
+Resolutions with `requires_evidence = false` are intentionally absent
 (BR-33) and never appear.
 
 ```mermaid

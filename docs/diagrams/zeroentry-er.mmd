@@ -1,0 +1,289 @@
+%% ZeroEntry schema revision 0014. Actor foreign keys to app_user are omitted for legibility.
+%% Attribute blocks show primary/foreign keys and selected fields; SCHEMA_REFERENCE.md lists every column and constraint.
+erDiagram
+  role ||--o{ app_user : "assigned role"
+  ulb |o--o{ app_user : "optional account scope"
+  contractor |o--o{ app_user : "optional account scope"
+  worker |o--o| app_user : "optional worker login"
+  app_user ||--o{ user_session : "owns sessions"
+  contractor ||--o{ worker : "employs"
+
+  ulb ||--o{ manhole : "contains"
+  ulb ||--o{ machine : "owns"
+  manhole ||--o{ complaint : "site of"
+  resolution_type |o--o{ complaint : "optional outcome"
+  complaint ||--o{ job : "generates work"
+  contractor ||--o{ job : "assigned contractor"
+  job ||--o{ machine_deployment : "uses machine"
+  machine ||--o{ machine_deployment : "deployed on"
+  job ||--o| mechanisation_waiver : "may have one waiver"
+
+  job ||--o{ entry_permit : "may have permit attempts"
+  entry_permit ||--o{ permit_crew : "has crew"
+  worker ||--o{ permit_crew : "serves on permits"
+  permit_crew ||--o{ gear_issue : "receives gear"
+  gear_item ||--o{ gear_issue : "issued item"
+  entry_permit ||--o{ gas_reading : "has readings"
+  gas_detector ||--o{ gas_reading : "records readings"
+  permit_crew ||--o{ entry_log : "entry interval belongs to crew member"
+  entry_permit ||--o| permit_authorization_decision : "one successful decision"
+  entry_permit ||--o{ permit_safety_event : "retains safety events"
+  entry_log |o--o{ permit_safety_event : "optional related interval"
+
+  worker ||--o{ incident : "worker involved"
+  contractor ||--o{ incident : "contractor at incident time"
+  manhole ||--o{ incident : "incident site"
+  job |o--o{ incident : "optional job context"
+  entry_permit |o--o{ incident : "optional permit and job pair"
+  permit_crew |o--o{ incident : "optional permit and worker pair"
+  incident ||--o| compensation_case : "may create one case"
+  job ||--o{ invoice : "billed by"
+  invoice ||--o{ invoice_hold : "may have holds"
+  shadow_entry_alert |o--o{ invoice_hold : "optional alert source"
+  incident |o--o{ invoice_hold : "optional incident source"
+
+  complaint ||--o{ shadow_entry_alert : "reviewed for missing evidence"
+  detection_rule ||--o{ shadow_entry_alert : "rule that fired"
+  contractor |o--o{ shadow_entry_alert : "optional responsible contractor"
+  shadow_entry_alert ||--o{ shadow_entry_alert_event : "has lifecycle history"
+
+  legal_clause ||--o{ legal_clause_source : "linked source"
+  policy_source ||--o{ legal_clause_source : "classifies citation"
+  policy_source ||--o{ rule_parameter : "supports active value"
+  rule_parameter ||--o{ rule_parameter_history : "retains revisions"
+  policy_source ||--o{ rule_parameter_history : "supports revision"
+
+  app_user {
+    bigint user_id PK
+    smallint role_id FK
+    bigint ulb_id FK
+    bigint contractor_id FK
+    bigint worker_id FK, UK
+    text email UK
+  }
+  audit_log {
+    bigint log_id PK
+    bigint actor_user_id "no foreign key by design"
+    text table_name
+    text row_pk
+    text action
+    jsonb old_data
+    jsonb new_data
+  }
+  compensation_case {
+    bigint case_id PK
+    bigint incident_id FK, UK
+    numeric amount_due
+    numeric amount_paid
+    date due_by
+    text status
+  }
+  complaint {
+    bigint complaint_id PK
+    bigint manhole_id FK
+    text resolution_code FK
+    text status
+    timestamptz resolved_at
+  }
+  contractor {
+    bigint contractor_id PK
+    text licence_no UK
+    date licence_valid_until
+    text status
+  }
+  detection_rule {
+    text rule_code PK
+    text title
+    text description
+    boolean enabled
+  }
+  entry_log {
+    bigint entry_id PK
+    bigint permit_id FK "composite FK to permit_crew"
+    bigint worker_id FK "composite FK to permit_crew"
+    tstzrange period
+  }
+  entry_permit {
+    bigint permit_id PK
+    bigint job_id FK
+    text status
+    timestamptz authorised_at
+    timestamptz valid_until
+  }
+  gas_detector {
+    bigint detector_id PK
+    text serial_no UK
+    text model
+    date calibration_valid_until
+  }
+  gas_reading {
+    bigint reading_id PK
+    bigint permit_id FK
+    bigint detector_id FK
+    text depth_level
+    numeric o2_pct
+    numeric h2s_ppm
+    numeric lel_pct
+    numeric co_ppm
+  }
+  gear_issue {
+    bigint issue_id PK
+    bigint permit_id FK "composite FK to permit_crew"
+    bigint worker_id FK "composite FK to permit_crew"
+    text gear_code FK
+    text serial_no
+  }
+  gear_item {
+    text gear_code PK
+    text name
+    boolean statutory
+  }
+  incident {
+    bigint incident_id PK
+    bigint worker_id FK
+    bigint contractor_id FK "time-of-incident snapshot"
+    bigint manhole_id FK
+    bigint job_id FK
+    bigint permit_id FK "composite foreign key"
+    text incident_type
+  }
+  invoice {
+    bigint invoice_id PK
+    bigint job_id FK
+    text invoice_no UK
+    numeric amount_inr
+    text status
+  }
+  invoice_hold {
+    bigint hold_id PK
+    bigint invoice_id FK
+    bigint alert_id FK "one of alert_id or incident_id"
+    bigint incident_id FK "one of alert_id or incident_id"
+    text reason
+    timestamptz released_at
+  }
+  job {
+    bigint job_id PK
+    bigint complaint_id FK
+    bigint contractor_id FK
+    text method
+    text status
+  }
+  legal_clause {
+    text clause_code PK
+    text title
+    text legal_ref
+  }
+  legal_clause_source {
+    text clause_code PK, FK
+    text source_code PK, FK
+    smallint sort_order
+  }
+  machine {
+    bigint machine_id PK
+    bigint ulb_id FK
+    text code UK
+    text kind
+    text status
+  }
+  machine_deployment {
+    bigint deploy_id PK
+    bigint job_id FK
+    bigint machine_id FK
+    text outcome
+    timestamptz outcome_recorded_at
+  }
+  manhole {
+    bigint manhole_id PK
+    bigint ulb_id FK
+    text code UK
+    text kind
+    numeric depth_m
+  }
+  mechanisation_waiver {
+    bigint waiver_id PK
+    bigint job_id FK, UK
+    text reason_code
+    text justification
+  }
+  permit_authorization_decision {
+    bigint decision_id PK
+    bigint permit_id FK, UK
+    jsonb snapshot
+    text snapshot_sha256
+  }
+  permit_crew {
+    bigint permit_id PK, FK
+    bigint worker_id PK, FK
+    text crew_role
+  }
+  permit_safety_event {
+    bigint event_id PK
+    bigint permit_id FK
+    bigint entry_id FK
+    text event_type
+    text reason_code
+    jsonb detail
+  }
+  policy_source {
+    text source_code PK
+    text source_type
+    text title
+    text applicability
+  }
+  resolution_type {
+    text code PK
+    boolean requires_evidence
+  }
+  role {
+    smallint role_id PK
+    text name UK
+  }
+  rule_parameter {
+    text param_key PK
+    text source_code FK
+    numeric value
+    integer revision
+    boolean is_assumption
+  }
+  rule_parameter_history {
+    bigint history_id PK
+    text param_key FK "composite unique with revision"
+    text source_code FK
+    integer revision "composite unique with param_key"
+    text change_reason
+  }
+  shadow_entry_alert {
+    bigint alert_id PK
+    bigint complaint_id FK "unique with rule_code"
+    text rule_code FK "unique with complaint_id"
+    bigint contractor_id FK
+    text status
+    timestamptz evidence_deadline
+  }
+  shadow_entry_alert_event {
+    bigint event_id PK
+    bigint alert_id FK
+    text from_status
+    text to_status
+    text note
+  }
+  ulb {
+    bigint ulb_id PK
+    text name
+    text district
+    text state
+  }
+  user_session {
+    bigint session_id PK
+    bigint user_id FK
+    bytea token_hash UK
+    timestamptz expires_at
+  }
+  worker {
+    bigint worker_id PK
+    bigint contractor_id FK
+    text namaste_id UK
+    date medical_fit_until
+    date trained_until
+  }

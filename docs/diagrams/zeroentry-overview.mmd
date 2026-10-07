@@ -1,0 +1,9 @@
+%% Pitch-level architecture. Full runtime details are in zeroentry-architecture.mmd.
+flowchart LR
+  People["Supervisor · Engineer<br/>Worker · Contractor · Auditor · Admin"] --> UI["Browser interface<br/>Permit checklist · Alerts · Reports"]
+  UI --> API["FastAPI<br/>Authenticate · Check roles · Validate input"]
+  API -->|"Parameterized SQL<br/>One transaction per request"| PG["PostgreSQL<br/>Evidence · Gate · Detection<br/>Holds · History · Row-level security"]
+  PG -->|"Decision and explanation<br/>Commit before success response"| API
+  API --> UI
+  Maintenance["Periodic maintenance<br/>Safety sweep + evidence scan"] --> PG
+  Migrations["Alembic<br/>14 forward-only SQL migrations"] --> PG

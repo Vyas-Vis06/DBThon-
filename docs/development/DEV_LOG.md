@@ -4,6 +4,66 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 
 ---
 
+## 2026-10-08 · Current UI screenshots, rendered diagrams and publication
+
+### Done
+
+* Replaced the earlier entry-gate screenshot and added dashboard, alert-list and late-evidence review captures from
+  the current operations-console UI. The browser used a fresh, isolated `.pgdata/docs-screenshots-20261008` instance
+  on port 8020; the user's earlier databases were untouched. All shown records are synthetic. Capture provenance and
+  reproduction steps are in [img/README.md](../img/README.md).
+* Verified the actual browser workflow: supervisor login, seeded CHN-ADY-010 permit, authorization refused with exactly
+  five failing checks; engineer login, five seeded alerts, and the CHN-ADY-006 late-evidence alert showing an active hold.
+  No alert review decision or successful authorization was made during screenshot capture.
+* Rendered eight [SVG diagrams](../diagrams/README.md#ready-to-use-exports), including a compact pitch architecture,
+  the full runtime/model and all five domain ER views. Existing local Mermaid 11.14.0 and headless Chrome supplied the
+  renderer; no repository dependency was added. Exports use plain SVG text and parse as XML without scripts or HTML
+  foreign objects. Visually checked the pitch overview, entry-gate ER and captured application screens.
+* Added [PITCH_CUE_CARD.md](../PITCH_CUE_CARD.md), linked the current screenshots and exports, and clarified the spoken
+  pitch's 641-word pacing. The main narrative remains personally authored; its technical continuation is optional.
+* User explicitly requested publication of the update to `main`; the documentation/screenshots are prepared for that push.
+
+### Validation
+
+`python -m pytest -n auto`, Python 3.12.11/macOS/embedded PostgreSQL: **575 passed in 29.63 s** after the screenshot
+and presentation changes. The browser capture exercised the current interface without establishing an automated browser
+regression suite. Generated schema/API references and published evaluation results remain unchanged.
+
+---
+
+## 2026-10-08 · README, database documentation and spoken pitch refresh
+
+### Done
+
+* Switched the clean checkout from the audit branch to `main` and fast-forwarded to upstream `1e5bd79`, including the
+  redesigned safety operations console, root launcher, judge guide and condition showcase.
+* Rebuilt README around the problem, stakeholders, three product decisions, demonstration, architecture, database
+  concepts, run commands, published measurements and documentation navigation.
+* Added [PITCH_SCRIPT.md](../PITCH_SCRIPT.md): a personally authored problem-first speech, hypothetical invoice/evidence
+  hook, 641-word main narrative, optional technical continuation, 90-second fallback, rehearsal cues and claim receipts.
+  Luna review checked the script against the implementation and published evaluation artifacts; root made the final edits.
+* Added [TABLE_GUIDE.md](../TABLE_GUIDE.md) for all 35 application tables and
+  [DATABASE_HANDBOOK.md](../DATABASE_HANDBOOK.md) for modelling, SQL operations, temporal evidence, concurrency,
+  security, reporting and reproduction. Expanded the ER/architecture explanations and added reusable
+  [Mermaid diagram files](../diagrams/README.md).
+* Kept the generated schema/API references and published benchmark artifacts unchanged. All quoted measurements are
+  attributed to their saved runs; no fresh latency or field-accuracy claim is made.
+
+### Validation
+
+`python -m pytest -n auto` via the local Python 3.12.11 environment: **575 passed in 35.28 s**, macOS, real embedded
+PostgreSQL. After the final documentation edits, the link/rule and ER/schema synchronization checks passed again:
+`tests/unit/test_docs.py tests/db/test_docs_in_sync.py`, **5 passed**. Standalone ER validation confirmed all 35 tables,
+all listed column names and all non-actor foreign-key relationships against the generated catalogue; the table guide also
+covers all 35 tables. `git diff --check` is clean. Mermaid source was checked structurally; visual rendering was not run.
+
+### Remaining
+
+Rehearse the speech and live-demo timing. Existing pilot, independent instrument integration and browser-automation
+limitations remain as tracked in ROADMAP. The documentation changes are local and uncommitted.
+
+---
+
 ## 2026-10-08 (later) · Condition showcase, copy-paste commands, conditions deck
 
 ### Done
