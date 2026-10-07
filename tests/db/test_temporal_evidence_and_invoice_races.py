@@ -244,9 +244,9 @@ def test_migration_backfills_audited_finalization_and_leaves_unverifiable_legacy
         with cluster.connect(database) as conn:
             conn.execute("CREATE TABLE alembic_version (version_num varchar(32) PRIMARY KEY NOT NULL)")
             sql_dir = ROOT / "database" / "migrations" / "sql"
-            # A pre-0013 database has only the numbered migration SQL available at this point.
+            # A pre-0013 database has migrations through 0012, before the temporal evidence change.
             for migration in sorted(sql_dir.glob("00*.sql")):
-                if int(migration.name[:4]) <= 11:
+                if int(migration.name[:4]) <= 12:
                     conn.execute(migration.read_text(encoding="utf-8"))
 
             f = Factory(conn)

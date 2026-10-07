@@ -35,7 +35,12 @@ INSERT INTO policy_source (source_code, source_type, title, source_url, source_v
    'Balram Singh v. Union of India, Supreme Court of India, 20 October 2023',
    'https://api.sci.gov.in/supremecourt/2020/4072/4072_2020_8_1502_47917_Judgement_20-Oct-2023.pdf', '2023 judgment, directions ¶96(4)-(7)',
    'Paragraph 96(4)-(7)',
-   'Court directions concerning sewer-death compensation and government/contract accountability; they do not supply every product threshold or make every sanction automatic.'),
+   'Court directions concerning sewer-death compensation and government/contract accountability; they do not supply every product threshold or make every sanction automatic. Earlier-death compensation applicability was clarified on 20 January 2026.'),
+  ('COURT_BALRAM_2026_CLARIFICATION', 'COURT_DIRECTION',
+   'Balram Singh compensation clarification, Supreme Court of India, 20 January 2026',
+   'https://api.sci.gov.in/supremecourt/2020/4072/4072_2020_16_39_67600_Order_20-Jan-2026.pdf', '20 Jan 2026 order, IA 68327/2025',
+   'Clarification paragraph 4(i)-(iii), pages 8-9',
+   'Earlier deaths require case-specific treatment: claims with ₹10 lakh ordered, determined and paid at the 20 October 2023 judgment date are not reopened; undetermined or unpaid claims fall under the clarified ₹30 lakh direction. The prototype does not adjudicate entitlement or reopening.'),
   ('GUIDANCE_CPHEEO_2018', 'GUIDANCE',
    'CPHEEO, Standard Operating Procedure for Cleaning of Sewers and Septic Tanks',
    'https://cpheeo.gov.in/upload/5c0a062b23e94SOPforcleaningofSewersSepticTanks.pdf', '2018 SOP',
@@ -118,7 +123,7 @@ INSERT INTO policy_source (source_code, source_type, title, source_url, source_v
    'ZeroEntry fatality compensation amount grounded in Balram Singh',
    'https://api.sci.gov.in/supremecourt/2020/4072/4072_2020_8_1502_47917_Judgement_20-Oct-2023.pdf', '2023 judgment',
    'Direction ¶96(4)',
-   'The judgment directs ₹30 lakh for sewer deaths. The app amount is a configured value and does not decide legal entitlement or a case-specific deadline.'),
+   'Configured ₹30 lakh based on direction ¶96(4), subject to case-specific applicability including the 20 January 2026 clarification. The app does not adjudicate entitlement, reopen settled earlier claims or determine a legal deadline.'),
   ('LAW_CREW_SIZE', 'LAW',
    '2013 Rules minimum crew count',
    'https://socialjustice.gov.in/public/ckeditor/upload/86751727950899.pdf', 'G.S.R. 776(E), 12 Dec 2013',
@@ -336,6 +341,13 @@ CREATE FUNCTION lock_authorization_policy() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF OLD.status = 'DRAFT' AND NEW.status = 'AUTHORISED' THEN
+    -- The checklist reads worker, contractor, detector, crew, gear, and reading rows that are not all
+    -- protected by this permit/policy lock. A runtime REPEATABLE READ snapshot can therefore retain
+    -- stale dependencies even after another transaction commits an ineligibility change on a DRAFT.
+    IF session_user = 'ze_app' AND current_setting('transaction_isolation') <> 'read committed' THEN
+      RAISE EXCEPTION 'Runtime authorization requires READ COMMITTED for fresh safety evidence; retry with READ COMMITTED'
+        USING ERRCODE = '40001';
+    END IF;
     PERFORM param_key FROM rule_parameter ORDER BY param_key FOR SHARE;
   END IF;
   RETURN NEW;
@@ -592,6 +604,6 @@ COMMENT ON TABLE rule_parameter_history IS 'Append-only current-value change his
 COMMENT ON TABLE permit_authorization_decision IS 'Immutable database-created JSONB snapshot for each successful authorization transition; not a formal proof or owner-resistant signature.';
 COMMENT ON COLUMN permit_authorization_decision.snapshot_sha256 IS 'SHA-256 over UTF-8 bytes of PostgreSQL JSONB text rendering of snapshot (PG16); verify against snapshot::text.';
 COMMENT ON FUNCTION permit_authorization_snapshot(bigint, timestamptz, bigint) IS 'Builds a versioned explanation snapshot of the exact successful entry gate decision and relevant evidence.';
-COMMENT ON FUNCTION lock_authorization_policy() IS 'Locks active rule_parameter rows before the permit gate UPDATE re-check, keeping thresholds and decision snapshot aligned.';
+COMMENT ON FUNCTION lock_authorization_policy() IS 'Rejects runtime non-READ COMMITTED authorizations to avoid stale dependency snapshots, then locks policy values before the permit gate re-check and decision snapshot.';
 REVOKE ALL ON FUNCTION permit_authorization_snapshot(bigint, timestamptz, bigint) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lock_authorization_policy() FROM PUBLIC;

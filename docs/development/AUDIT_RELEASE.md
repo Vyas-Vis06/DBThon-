@@ -4,7 +4,9 @@ The audited foundation was commit `e8632699e85c4167940194649444d45ff5537621`. It
 database design: mechanisation-first jobs, written waivers, a database entry gate, crew/gear division, gas checks,
 entry intervals, atomic incident consequences, SE1/SE2 evidence-gap detection, source-linked invoice holds,
 authentication, RBAC, RLS and a working UI. Its original 509-test suite passed locally. This release extends that
-foundation through migrations 0012–0014; migrations 0001–0010 are unchanged.
+foundation through migrations 0012–0014. While this release was underway, upstream commit `fc4261e` added M6 evaluation,
+the submission/rubric guide and migration 0011's materialized parameter optimization. Those changes are merged and
+preserved; migrations 0001–0011 are unchanged. The additional temporal evaluator is `scripts/evaluate_temporal.py`.
 
 ## Audit findings and implemented corrections
 

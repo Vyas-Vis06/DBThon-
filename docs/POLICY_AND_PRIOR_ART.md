@@ -50,7 +50,7 @@ does not promise historical replay.
 | 15-minute reading age | **PRODUCT_POLICY** | No 15-minute freshness requirement was identified in the cited Rules or reviewed CPHEEO/ERSU guidance. The value is configurable and should be shown as an assumption. |
 | Daylight window | **PRODUCT_POLICY** — 2013 Rules r. 6(3)(k) supplies the daylight requirement | Fixed 06:00–18:00 hours are a proxy, not an astronomical daylight calculation. |
 | 90-minute stretch and 30-minute rest | **LAW** — Rules r. 6(3)(k)(i)–(ii); CPHEEO SOP Step 4(xiv) | The entry-log guard enforces the configured 30-minute rest per worker after a recorded stretch of at least 90 minutes, starting from the later of reported exit and server receipt. The Rule says a 30-minute interval between stretches; this implementation does not assert an automatic rest timer after shorter stretches. |
-| Fatality compensation | **COURT_DIRECTION** — *Balram Singh*, ¶96(4) | The judgment directs ₹30 lakh for sewer deaths. The app's amount does not make an entitlement determination or set a general 30-day deadline. |
+| Fatality compensation | **COURT_DIRECTION** — *Balram Singh*, ¶96(4), clarified on 20 Jan 2026 | The configured ₹30 lakh reflects the direction, subject to case-specific applicability. The 2026 order distinguishes earlier deaths with settled ₹10-lakh claims from undetermined/unpaid claims at the 2023 judgment date. The app does not adjudicate entitlement or reopening and the direction supplies no general 30-day deadline. |
 | Disability compensation and due time | **PRODUCT_POLICY** informed by *Balram Singh*, ¶96(5) | The judgment uses severity-sensitive minimums: ₹10 lakh minimum, and ₹20 lakh minimum for the stated permanent-disability/economic-helplessness condition. The app's flat ₹20 lakh and 30-day due period are product assumptions, not a universal court amount/ceiling or judgment deadline. |
 | Automatic blacklist on fatality | **PRODUCT_POLICY** informed by *Balram Singh*, ¶96(6)–(7) | The prototype's automatic state change is a team sanction choice. The judgment describes accountability/cancellation and possible model-contract blacklisting; it does not make this automatic for every record. |
 | 24-hour evidence grace | **PRODUCT_POLICY** | A configurable synchronization window, not an identified statutory period. |
@@ -59,6 +59,7 @@ Primary documents linked from the database source rows:
 
 - [Official Gazette: 2013 Manual Scavengers Rules (G.S.R. 776(E))](https://socialjustice.gov.in/public/ckeditor/upload/86751727950899.pdf)
 - [Supreme Court: *Balram Singh v. Union of India*, 20 October 2023](https://api.sci.gov.in/supremecourt/2020/4072/4072_2020_8_1502_47917_Judgement_20-Oct-2023.pdf)
+- [Supreme Court: clarification of earlier-death compensation, 20 January 2026, IA 68327/2025](https://api.sci.gov.in/supremecourt/2020/4072/4072_2020_16_39_67600_Order_20-Jan-2026.pdf)
 - [MoHUA/CPHEEO: 2018 sewer and septic-tank cleaning SOP](https://cpheeo.gov.in/upload/5c0a062b23e94SOPforcleaningofSewersSepticTanks.pdf)
 - [MoHUA ERSU handbook](https://static.pib.gov.in/WriteReadData/userfiles/SBM%20ERSU%20Book_Final.pdf)
 - [CDC/NIOSH Pocket Guide: Carbon monoxide exposure limits](https://www.cdc.gov/niosh/npg/npgd0105.html)

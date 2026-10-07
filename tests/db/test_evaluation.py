@@ -27,6 +27,9 @@ def test_every_invalid_write_is_refused_by_zeroentry_and_only_the_unique_constra
     assert [r["rule"] for r in rows if not r["zeroentry"]["refused"]] == []
     assert [r["rule"] for r in rows if r["baseline"]["refused"]] == ["BR-34"]
     assert all(r["zeroentry"]["sqlstate"].startswith("ZE") for r in rows if r["rule"] != "BR-34")
+    rest = next(r for r in rows if r["rule"] == "BR-10")
+    assert "rest for 30 minutes" in rest["zeroentry"]["message"]
+    assert rest["baseline"] == {"refused": False, "sqlstate": None, "message": "accepted"}
 
 
 def test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row(conn):
@@ -42,6 +45,14 @@ def test_the_history_generator_goes_through_the_real_gate_and_the_measurements_r
     n = lambda q: conn.execute(q).fetchone()["n"]  # noqa: E731
     assert n("SELECT count(*) AS n FROM entry_permit WHERE status = 'CLOSED'") == 20          # 5 % of 400, all authorised
     assert n("SELECT count(*) AS n FROM entry_log") == 40                                   # two logged entrants each
+    assert n("""SELECT count(*) AS n FROM machine_deployment d JOIN job j USING (job_id)
+                 JOIN complaint c USING (complaint_id) WHERE c.description = 'Synthetic history'
+                   AND d.outcome_recorded_at IS DISTINCT FROM d.recorded_at""") == 0
+    assert n("""SELECT count(*) AS n FROM entry_log e JOIN entry_permit p USING (permit_id)
+                 JOIN job j USING (job_id) JOIN complaint c USING (complaint_id)
+                WHERE c.description = 'Synthetic history (manual)'
+                  AND (e.recorded_at IS DISTINCT FROM upper(e.period) + interval '5 minutes'
+                    OR e.exit_recorded_at IS DISTINCT FROM upper(e.period) + interval '5 minutes')""") == 0
     assert last["complaints"] == 401 and last["permits"] == 21                              # plus the probe permit
     assert last["naive_flagged"] > last["zeroentry_candidates"] > 0                          # exempt resolutions inflate naive
     assert last["decision"]["median_ms"] > 0 and last["detect_plan"]["buffers"] > 0

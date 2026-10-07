@@ -105,6 +105,7 @@ Format: **context** → **decision** → **consequences** (including what it cos
 * **Decision.** Baselines live in `database/evaluation/` and run only in a throwaway database, never as migrations. Migration
   `0011` re-creates `v_shadow_se1` and `v_shadow_se2` with `WITH g AS MATERIALIZED`; `rule_num()` is `STABLE`, so results are
   unchanged. A test checks the plan keeps the CTE (`tests/db/test_evaluation.py`).
-* **Consequences.** The scan is 12x faster at 100,000 complaints (735 ms instead of 8.9 s; see [EVALUATION.md](../EVALUATION.md)). The evaluation is a
+* **Consequences.** The initial M6 measurement on commit `fc4261e` recorded a 12x scan improvement at 100,000 complaints.
+  Current measurements are regenerated for the hardened release in [EVALUATION.md](../EVALUATION.md). The evaluation is a
   repeatable command, and its counts (not its timings) are asserted in CI. Any future view that reads a parameter should
   materialise it the same way.

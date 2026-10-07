@@ -3,7 +3,7 @@
 Use a fresh, isolated synthetic demo directory without resetting an existing database:
 
 ```bash
-python scripts/dev.py --data-dir .pgdata/presentation --port 8000
+python scripts/dev.py --data-dir .pgdata/presentation-release --port 8000
 ```
 
 Keep the generated password at hand. For a presentation outside 06:00–18:00 IST, an ADMIN can widen the product daylight

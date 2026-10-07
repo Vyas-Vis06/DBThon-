@@ -157,6 +157,42 @@ def test_authorisation_rechecks_gas_freshness_after_waiting_for_the_permit_row(d
     assert current_failures >= 3
 
 
+@pytest.mark.parametrize("path", ["authorise_entry", "raw_update"])
+def test_repeatable_read_authorization_cannot_use_a_stale_draft_dependency(db, conn, path):
+    """A runtime RR snapshot must not authorize after a DRAFT crew member becomes inactive."""
+    conn.execute("UPDATE rule_parameter SET value = 0 WHERE param_key = 'daylight_start_hour'")
+    conn.execute("UPDATE rule_parameter SET value = 24 WHERE param_key = 'daylight_end_hour'")
+    s = Factory(conn).gate_scenario(datetime.now(IST))
+
+    with db.connect("ze_app", autocommit=False) as runtime:
+        runtime.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+        runtime.execute("SET lock_timeout = '8s'")
+        runtime.execute("SET statement_timeout = '12s'")
+        act_as(runtime, s["supervisor"], "SUPERVISOR")
+        assert runtime.execute(
+            "SELECT is_active FROM worker WHERE worker_id = %s", (s["e1"],)
+        ).fetchone()["is_active"]
+
+        # The dependency trigger serializes DRAFT permits but intentionally does not rewrite their state.
+        conn.execute("UPDATE worker SET is_active = false WHERE worker_id = %s", (s["e1"],))
+        with pytest.raises(psycopg.Error) as error:
+            if path == "authorise_entry":
+                runtime.execute("SELECT * FROM authorise_entry(%s, %s, now())", (s["permit"], s["supervisor"]))
+            else:
+                runtime.execute(
+                    "UPDATE entry_permit SET status = 'AUTHORISED', authorised_at = now(), authorised_by = %s "
+                    "WHERE permit_id = %s",
+                    (s["supervisor"], s["permit"]),
+                )
+        assert error.value.sqlstate == "40001"
+        runtime.rollback()
+
+    assert conn.execute("SELECT status FROM entry_permit WHERE permit_id = %s", (s["permit"],)).fetchone()["status"] == "DRAFT"
+    assert conn.execute(
+        "SELECT count(*) AS n FROM permit_authorization_decision WHERE permit_id = %s", (s["permit"],)
+    ).fetchone()["n"] == 0
+
+
 def test_repeatable_read_payment_waiting_for_new_alert_hold_is_rejected(db, conn):
     """A stale transaction snapshot cannot pay through an alert hold that won the invoice lock."""
     world = _invoice_world(conn)

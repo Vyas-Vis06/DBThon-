@@ -55,7 +55,8 @@ Indian law prohibits manual cleaning of sewers and septic tanks except under str
 dying. The proposal cites (these figures come from the proposal's sources and **must be re-verified before they are
 quoted in a presentation**): 1,248 deaths since 1993 with Tamil Nadu highest at 253 (Rajya Sabha, Nov 2024); a
 government-commissioned social audit finding no safety equipment in 49 of 54 deaths; and the Supreme Court's
-*Balram Singh v. Union of India* (2023) directions of ₹30 lakh compensation per death.
+*Balram Singh v. Union of India* (2023) ₹30-lakh direction, subject to case-specific applicability and the
+20 January 2026 clarification for earlier deaths. The prototype's configured amount is not an entitlement determination.
 
 The project addresses the gap between recorded safeguards and an individual job decision. Digital permit systems already
 support entry gates and competency/gas controls. ZeroEntry studies a municipal integration of database-owned permits,

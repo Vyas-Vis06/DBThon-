@@ -16,13 +16,16 @@ WHERE c.status = 'RESOLVED'
                   WHERE p.job_id = j.job_id AND p.status = 'CLOSED');
 
 -- ---------------------------------------------------------------------------------------------
--- eval_add_history(n): append n resolved complaints of synthetic history, through every trigger (nothing is bypassed).
+-- eval_add_history(n): append n resolved complaints of synthetic history, through the shipped triggers on insert.
 --   * 3 %  resolved NO_BLOCKAGE_FOUND (intentionally absent evidence, BR-33)
 --   * 5 %  cleared by a lawful manual entry: waiver, permit, 4 crew, statutory gear, 3 gas readings, authorise_entry(),
 --          two logged entries, closed (so entry_permit, permit_crew, gear_issue, gas_reading and entry_log grow too)
 --   * the rest cleared by a machine, except about 2 % left with no evidence at all (shadow-entry candidates)
 -- Everything happens in the past and well outside the 24 h grace window. Permits are spaced in daylight slots so the
--- entry rules (window, daylight, 90 minutes, no overlap per worker) all hold. Returns the number of permits created.
+-- entry rules (window, daylight, 90 minutes, no overlap per worker) all hold. The Python harness then performs a
+-- narrowly scoped owner-only receipt backfill for these labelled synthetic rows; ordinary runtime writes cannot choose
+-- receipt times. This is fixture construction, not evidence of physical worker, detector, or sensor authenticity.
+-- Returns the number of permits created.
 -- ---------------------------------------------------------------------------------------------
 CREATE FUNCTION eval_add_history(p_n int) RETURNS int LANGUAGE plpgsql AS $$
 DECLARE

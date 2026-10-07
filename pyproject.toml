@@ -34,6 +34,7 @@ zeroentry = ["web/shell.html", "web/static/**/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+faulthandler_timeout = 120
 filterwarnings = [
   # Starlette 1.x nags about its own TestClient's httpx backend; harmless and outside our control.
   "ignore:Using `httpx` with `starlette.testclient`",

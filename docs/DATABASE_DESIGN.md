@@ -236,6 +236,8 @@ transaction at the supported isolation level. The API already uses `READ COMMITT
 `policy_source` stores immutable classifications and applicability. `legal_clause_source` links each clause to its relevant
 sources. `rule_parameter_history` appends current-value revisions with a server timestamp, actor and written reason.
 `permit_authorization_decision` stores one immutable successful-transition JSONB explanation plus a database-computed
-SHA-256 of its PostgreSQL text rendering. Policy share locks keep active thresholds and the snapshot aligned. Snapshot
+SHA-256 of its PostgreSQL text rendering. Policy share locks keep active thresholds and the snapshot aligned. Runtime
+authorization requires `READ COMMITTED`; stale snapshots of a draft's worker credentials otherwise survive permit locking,
+so both the function and raw transition refuse other isolation levels with `40001`. Snapshot
 JSON deliberately preserves historical values rather than normalizing them into mutable current rows. This is an explanation
 artifact with a database-owner trust boundary, not a legal compiler or externally anchored signature.

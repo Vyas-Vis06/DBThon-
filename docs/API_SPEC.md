@@ -10,8 +10,8 @@ Interactive documentation with request/response schemas: run the app and open `/
 * **The database decides.** The API authenticates, checks the role, and calls SQL. Business rules (entry gate, 90-minute limit,
   state machine, holds) are enforced by PostgreSQL; their refusals come back with the database's own message.
 * **One transaction per request**, committed *before* the response is sent. A response of 2xx means the change is durable.
-  Runtime financial writes require PostgreSQL `READ COMMITTED` (the API default). Invoice creation/status, alert/incident
-  creation and hold creation reject stronger snapshot isolation with SQLSTATE `40001`; direct SQL callers must retry the
+  Runtime authorization and financial writes require PostgreSQL `READ COMMITTED` (the API default). Authorization,
+  invoice creation/status, alert/incident creation and hold creation reject other snapshot isolation with SQLSTATE `40001`; direct SQL callers must retry the
   whole transaction using `READ COMMITTED`. A stale repeatable-read snapshot cannot safely recheck newly committed holds.
 
 ## Authentication

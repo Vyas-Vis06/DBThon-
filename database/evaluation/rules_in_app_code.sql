@@ -3,6 +3,11 @@
 -- trigger (the gate, freezes, guards, append-only rules, audit). That is the usual design in which the business rules
 -- live in application code: the database still holds the data but accepts any write a client sends.
 -- Foreign keys keep working (DISABLE TRIGGER USER leaves the internal constraint triggers on).
+--
+-- Scope: this measures whether the database schema itself rejects the listed malformed writes when its guards are
+-- present. It does not establish that a recorded event happened physically, authenticate a worker or instrument, or
+-- protect either design from a privileged database owner/superuser who can alter data or disable triggers. The owner
+-- disables triggers here only to construct a controlled comparison in a disposable evaluation database.
 DO $$
 DECLARE
   t record;

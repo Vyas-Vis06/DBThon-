@@ -7,8 +7,10 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 ## 2026-10-07 · Audit hardening, preserved decisions and presentation evidence
 
 **State:** original foundation extended on `feat/audit-hardening-and-evaluation`, with three new forward migrations,
-35 tables, new scoped read endpoints and presentation screens. Original migrations 0001–0010 remain unchanged.
-Full local release suite: **568 passed in 30.21 seconds**, macOS, Python 3.12.11, embedded PostgreSQL 16.2.
+35 tables, new scoped read endpoints and presentation screens. Original migrations 0001–0011 remain unchanged.
+Initial audit version, before the concurrent M6 integration: **568 passed in 30.21 seconds**, macOS, Python 3.12.11,
+embedded PostgreSQL 16.2. All six CI jobs passed on `28b8bee`, including PostgreSQL service and all five OS/Python jobs.
+The integrated release's full-suite result is recorded below after the final run.
 Branch CI is configured for the original five OS/Python jobs and a separate PostgreSQL 16 service; see Actions for its
 current result. The release is for review, not an automatic merge or a production safety certification.
 
@@ -32,6 +34,16 @@ current result. The release is for review, not an automatic merge or a productio
   safety events. A subsequent policy revision left the original decision bytes/digest unchanged.
 * Original-decision, safety-history and policy-history screens were manually walked through in the in-app browser.
   Automated browser coverage remains unimplemented.
+
+### Concurrent upstream integration
+
+Upstream `fc4261e` added M6 while the audit release was underway. It is merged, including its original migration `0011`.
+The audit migrations are now 0012–0014, and their SE1 view preserves the upstream materialized parameter CTE.
+The main `scripts/evaluate.py` is retained and adapted to truthful historical receipt imports and a current rest-admission
+probe; `scripts/evaluate_temporal.py` is the supplementary SE1 finalization experiment. The unmaterialized comparison
+retains final temporal semantics. Runtime draft authorization now also requires READ COMMITTED to prevent stale worker
+credentials in repeatable-read snapshots, with regressions for function and raw UPDATE. Source provenance includes the
+official 20 January 2026 compensation clarification. Final integrated measurements and full-suite validation follow.
 
 ### Handoff
 

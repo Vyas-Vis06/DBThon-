@@ -47,6 +47,7 @@ credentials, personal data or production URLs in an issue.
 | Payment/approval, source holds and new invoices share serialization locks; unsupported stale snapshot isolation is refused | migration `0013` | `tests/db/test_temporal_evidence_and_invoice_races.py`, `tests/db/test_integration_adversarial.py` |
 | Runtime policy writes update only the value; revision, actor and receipt time are trigger-owned; reason required | migration `0014`, `routers/admin.py` | `tests/db/test_policy_provenance.py`, `tests/db/test_integration_adversarial.py` |
 | Authorization saves immutable evidence, source classifications and policy revisions with a SHA-256 digest; tenant scope applies to decision and safety history | migration `0014`, permit endpoints | `tests/db/test_policy_provenance.py`, `tests/api/test_decision_history_api.py` |
+| Runtime authorization requires READ COMMITTED; stale snapshots of draft-worker credentials are refused through both function and raw UPDATE | migration `0014` | `tests/db/test_integration_adversarial.py` |
 | A failed detection scan cannot roll back a committed safety stop; automatic work uses bounded waits and transaction advisory locks | `maintenance.py` | `tests/db/test_maintenance.py` |
 
 ## Known limitations (not hidden, not fixed)

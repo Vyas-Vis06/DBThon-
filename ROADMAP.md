@@ -34,7 +34,7 @@ and [evaluation/RESULTS.md](docs/evaluation/RESULTS.md). Pilot work remains in t
 | Automatic safety sweep and detection, with independent commits and bounded locks | [x] | `tests/db/test_maintenance.py` |
 | Installed wheel includes shell and static UI | [x] | `scripts/check_wheel.py` against a separately installed wheel |
 | Synthetic sensor demonstration using authenticated local API | [x] | `scripts/simulate_gas.py` run on isolated fresh demo data; unsafe BOTTOM reading stops permit; UI exit recorded after stop |
-| PostgreSQL 16 service CI alongside existing OS matrix | [-] | workflow implemented; branch Actions run pending |
+| PostgreSQL 16 service CI alongside existing OS matrix | [x] | all six jobs passed on audit build `28b8bee`; see branch Actions for the integrated head |
 | Reproducible 1k/10k/100k synthetic evidence-gap evaluation with labelled baseline | [x] | `scripts/evaluate_temporal.py`, `docs/evaluation/results.json` |
 | Original-decision, safety-history and policy-history screens | [-] | manually verified in browser; automated browser coverage pending |
 

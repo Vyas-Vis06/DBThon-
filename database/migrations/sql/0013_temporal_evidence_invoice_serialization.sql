@@ -173,8 +173,8 @@ REVOKE ALL ON FUNCTION invoice_hold_guard() FROM PUBLIC, ze_app;
 
 -- SE1 must use the time the clearance result was actually finalized, not the earlier deployment-row receipt.
 CREATE OR REPLACE VIEW v_shadow_se1 WITH (security_invoker = true) AS
-WITH g AS (SELECT rule_num('shadow_grace_hours')::int AS hours,
-                  make_interval(hours => rule_num('shadow_grace_hours')::int) AS grace)
+WITH g AS MATERIALIZED (SELECT rule_num('shadow_grace_hours')::int AS hours,
+                               make_interval(hours => rule_num('shadow_grace_hours')::int) AS grace)
 SELECT c.complaint_id,
        'SE1_NO_CLEARANCE_EVIDENCE'::text            AS rule_code,
        c.manhole_id, m.ulb_id,
