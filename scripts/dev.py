@@ -85,6 +85,11 @@ def main() -> None:
             print(f"Demo logins (password for all: {keep['demo_password']}):")
             for login, role, name, _ in DEMO_USERS:
                 print(f"  {login + '@' + EMAIL_DOMAIN:<32} {role:<11} {name}")
+        where = "" if home == (ROOT / ".pgdata").resolve() else f" --data-dir {args.data_dir}"
+        print("Explore the database from another terminal:")
+        print(f"  python run.py psql{where}          SQL console as the owner (\\q to quit)")
+        print(f"  python run.py psql --app{where}    as ze_app, the API's least-privileged role")
+        print(f"  python run.py sql{where}           the seven annotated showcase queries")
         print("Ctrl+C to stop.\n")
         uvicorn.run("zeroentry.main:create_app", factory=True, host=args.host, port=args.port, log_level="info")
     finally:

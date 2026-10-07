@@ -30,11 +30,13 @@ On Python 3.13+ see [SETUP.md](docs/SETUP.md#requirements) first.
 
 ```bash
 git clone https://github.com/Vyas-Vis06/DBThon-.git zeroentry && cd zeroentry
-python -m venv .venv
-source .venv/bin/activate              # Windows PowerShell:  .venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-python scripts/dev.py                  # migrate, load demo data, serve http://127.0.0.1:8000/
+python run.py                          # first run creates .venv and installs; then migrate, load demo data, serve http://127.0.0.1:8000/
 ```
+
+`run.py` is the only file you need to run: `python run.py sql` runs the SQL showcase against the live database,
+`python run.py test` the test suite. **Judges and newcomers:** start at [docs/guide/](docs/guide/README.md) (run guide, the
+project explained from zero, tech stack and ACID/concurrency guarantees, and a reviewer Q&A). Manual setup (your own venv,
+then `python scripts/dev.py`) still works; see [SETUP.md](docs/SETUP.md).
 
 Sign in as `supervisor@zeroentry.example` with the password `dev.py` prints, open the **DRAFT** permit and press
 *Ask the database to authorise entry*: denied, with five reasons. The full three-minute story is in
@@ -76,6 +78,7 @@ CI runs the suite on Linux/Windows (Python 3.11/3.12), macOS (3.12), and a dispo
 
 | Read | For |
 |---|---|
+| [docs/guide/](docs/guide/README.md) | **start here:** [copy-paste demo commands](docs/guide/DEMO_COMMANDS.md) · [conditions deck](docs/guide/ZeroEntry_Conditions.pptx) (`python run.py showcase`) · run and try it live · [the project explained](docs/guide/PROJECT_EXPLAINED.md) · [tech stack and ACID/concurrency guarantees](docs/guide/TECH_STACK_AND_GUARANTEES.md) · [judge Q&A](docs/guide/JUDGE_QA.md) |
 | [docs/SUBMISSION.md](docs/SUBMISSION.md) | **for the judges:** the DBThon brief's eight components, five-step novelty, 30-mark rubric, SDG and TRL, each mapped to evidence |
 | [docs/EVALUATION.md](docs/EVALUATION.md) · [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) | how ZeroEntry is measured against conventional approaches · the generated numbers |
 | [PROJECT_SPEC.md](PROJECT_SPEC.md) | the problem, roles, business rules (`BR-nn`) and assumptions (`A-nn`) |

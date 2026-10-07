@@ -53,7 +53,7 @@ Show this change in policy history, and explain that astronomical daylight and r
    procedure call. In a terminal:
 
    ```bash
-   python scripts/run_sql.py database/queries/06_transactions.sql
+   python scripts/run_sql.py database/queries/06_transactions.sql --data-dir .pgdata/presentation-final
    ```
 
    > "If any step of that procedure fails, nothing is left behind: here is the rollback."
@@ -78,7 +78,7 @@ python scripts/evaluate.py --sizes 1000 --per-class 5 --out -
 ## Backup: the same story in SQL only
 
 ```bash
-python scripts/run_sql.py database/queries/07_trigger_refusals.sql      # nine rules refusing nine bad writes
-python scripts/run_sql.py database/queries/04_division_and_anti_join.sql
-python scripts/run_sql.py database/queries/05_views_functions_procedures.sql
+python scripts/run_sql.py database/queries/07_trigger_refusals.sql --data-dir .pgdata/presentation-final      # nine rules refusing nine bad writes
+python scripts/run_sql.py database/queries/04_division_and_anti_join.sql --data-dir .pgdata/presentation-final
+python scripts/run_sql.py database/queries/05_views_functions_procedures.sql --data-dir .pgdata/presentation-final
 ```

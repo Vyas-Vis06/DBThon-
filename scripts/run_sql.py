@@ -1,6 +1,8 @@
 """Run a .sql file against the development database and print every result set (and every NOTICE) as a text table.
 
     python scripts/run_sql.py database/queries/04_division_and_anti_join.sql
+    python scripts/run_sql.py "SELECT * FROM v_permit_compliance"
+    python scripts/run_sql.py database/queries/06_transactions.sql --data-dir .pgdata/presentation-final
 
 Targets the embedded database started by `python scripts/dev.py` (it must be running), or any server named by
 MIGRATION_DATABASE_URL / DATABASE_URL when --url is given. Runs with autocommit ON, so the explicit BEGIN / ROLLBACK in
@@ -23,20 +25,21 @@ def table(columns: list[str], rows: list[tuple]) -> str:
     return "\n".join([line(columns), "-+-".join("-" * w for w in widths), *(line(r) for r in cells), f"({len(rows)} row{'s' if len(rows) != 1 else ''})"])
 
 
-def dsn_for_dev() -> str:
+def dsn_for_dev(data_dir: Path) -> str:
     import pgserver
     from psycopg.conninfo import make_conninfo
-    server = pgserver.get_server(ROOT / ".pgdata" / "cluster", cleanup_mode=None)      # attaches to the running dev database
+    server = pgserver.get_server(data_dir.resolve() / "cluster", cleanup_mode=None)    # attaches to the running dev database
     return make_conninfo(server.get_uri(), dbname="zeroentry")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("file")
+    parser.add_argument("file", help="a .sql file, or one SQL statement in quotes")
     parser.add_argument("--url", help="postgresql://... instead of the embedded dev database")
+    parser.add_argument("--data-dir", type=Path, default=ROOT / ".pgdata", help="the --data-dir given to scripts/dev.py")
     args = parser.parse_args()
-    script = Path(args.file).read_text(encoding="utf-8")
-    dsn = args.url or dsn_for_dev()
+    script = Path(args.file).read_text(encoding="utf-8") if args.file.lower().endswith(".sql") else args.file
+    dsn = args.url or dsn_for_dev(args.data_dir)
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.add_notice_handler(lambda n: print(f"NOTICE: {n.message_primary}"))
         cur = conn.cursor()

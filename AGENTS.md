@@ -53,6 +53,7 @@ Applies to Codex, Claude Code, Cursor, Copilot and humans. Keep this file short;
 | `database/evaluation/` | Baselines and synthetic history for `scripts/evaluate.py` (throwaway database only; never a migration) |
 | `src/zeroentry/` | API: `config`, `db`, `models`, `security`, `deps`, `errors`, `routers/`, `web/` (static UI) |
 | `tests/unit`, `tests/db`, `tests/api` | Pure unit tests · SQL behaviour tests · HTTP/role tests |
+| `run.py` (root) | The judges' entry point: creates `.venv` on first run, then `dev.py`; also `sql`, `psql`, `test` ([docs/guide/](docs/guide/README.md)) |
 | `scripts/` | `dev.py` (one-command run), `db.py` (migrate/bootstrap/new/reset), `seed.py`, `run_sql.py`, `gen_docs.py`, `evaluate.py` (measured comparison) |
 
 ## Safe commands

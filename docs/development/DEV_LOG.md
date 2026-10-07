@@ -4,6 +4,82 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 
 ---
 
+## 2026-10-08 (later) · Condition showcase, copy-paste commands, conditions deck
+
+### Done
+* **`scripts/showcase.py`** (`python run.py showcase`) starts its own throwaway PostgreSQL. It builds one template from the
+  migrations plus the demo seed (widening daylight to all day in that copy, through policy history with a reason), clones one
+  database per condition and runs **19 conditions concurrently**. Each one prints the situation, the action, the database's
+  reaction and the state before and after. It exits 1 on any unexpected reaction. The conditions:
+  * A, the gate: denied, raw-UPDATE bypass, authorised with snapshot, expired detector, frozen crew;
+  * B, the work: overlap (`23P01`), standby entering, unsafe O2 aborting the permit while the exit is still recorded;
+  * C, detection: idempotent scan, late evidence leading to `EVIDENCE_RECEIVED`, dismissal releasing only its own hold,
+    supervisor refused (`ZE006`);
+  * D, money: held invoice, atomic fatality with the blacklisted contractor refused a new job, forced failure rolled back
+    (`23514`);
+  * E, concurrency: crew race during authorisation, double payment;
+  * F, security: RLS row counts per user, three `ze_app` statements refused with `42501`.
+* **`tests/db/test_showcase.py`** runs it as a subprocess and requires 19 of 19.
+* **`docs/guide/DEMO_COMMANDS.md`:** terminal-by-terminal commands to copy and paste.
+* **`docs/guide/ZeroEntry_Conditions.pptx`:** 14 slides with speaker notes, built with pptxgenjs from the real showcase
+  output. It validates, and every slide was checked visually through PowerPoint's own export. The generator script is not
+  kept in the repository; it needs Node and pptxgenjs.
+
+### Tests run
+* `python run.py showcase`: 19 of 19 as expected, about 1.5 s wall time for the conditions.
+* `tests/db/test_showcase.py`: 1 passed (39 s).
+* Full suite `python -m pytest -n 6` on Windows, Python 3.11: **575 passed in 190 s** (574 plus the showcase test).
+
+---
+
+## 2026-10-08 · Frontend merged into main; one-command run; judge's guide
+
+### Done
+* **Merge:** `main` fast-forwarded to `origin/feat/frontend-safety-operations-ui` (`04c7d8d`, the safety-operations console
+  redesign), which sits on `origin/main` (`a3db1b4`, PR #1 squashed). No conflicts. The earlier entry's four merge points were
+  already handled by PR #1: migrations renumbered `0012`-`0014`, the materialised CTE kept (now in `0013`),
+  `evaluate_temporal.py` separate. **Local only; not pushed.**
+* **`run.py` (repository root):** the one command. It creates `.venv` with Python 3.11/3.12 on first run, installs (it
+  reinstalls only when `pyproject.toml` changes), then delegates: no flags → `scripts/dev.py`, `sql [file|"SQL"]` →
+  `run_sql.py` (no file runs all seven showcase files), `psql [--app]` → the bundled psql as the owner or `ze_app`,
+  `test` → pytest, `<name>` → `scripts/<name>.py`. `--data-dir` passes through.
+* **`scripts/run_sql.py`:** `--data-dir` (it was hard-wired to `.pgdata`, so DEMO_SCRIPT's `.pgdata/presentation-final`
+  runs attached to the wrong cluster) and inline SQL. DEMO_SCRIPT now passes the matching `--data-dir`.
+* **`scripts/dev.py`:** the startup banner lists `run.py psql`, `psql --app` and `sql`, with the `--data-dir` in use.
+* **`docs/guide/`:** README (run and try it, evening daylight caveat), PROJECT_EXPLAINED (from zero), TECH_STACK_AND_GUARANTEES
+  (stack; ACID, isolation choice, races and their tests; security; audit; performance; limits), JUDGE_QA (48 questions with
+  answers, plus live-demo challenges). Linked from README.
+
+### Tests run
+* `python -m pytest -n 6` on the merged code before any change, Windows, Python 3.11: **574 passed in 144 s**.
+* After the `run_sql.py` change and the guides: **574 passed in 166 s** (same machine). After the final doc edits:
+  `tests/unit/test_docs.py` and `tests/db/test_demo_queries.py`, **17 passed**.
+* Manual walk in the in-app browser on an isolated `.pgdata/judge-demo` (started by
+  `python run.py --data-dir .pgdata/judge-demo --port 8010`), at about 00:06 IST:
+  * as supervisor: dashboard, then the DRAFT permit on CHN-ADY-010 denied with the five expected clauses; added a standby,
+    "Issue all missing" gear, logged TOP/MID/BOTTOM with GD-4G-0001, then **AUTHORISED** (authorisation works at night;
+    only starting an entry is limited to daylight); Original authorisation shows "Saved decision digest verified";
+  * as engineer: five alerts listed; dismissing alert #5 (CHN-ADY-006) released exactly hold #4, with holds 1-3 still active
+    (checked with `run.py sql`); the UI scan reported 0 opened, nothing re-opened;
+  * as admin: users and policy-and-sources pages loaded;
+  * every API call returned 2xx, except a deliberate logout without a CSRF token (403, as designed).
+* `python run.py sql --data-dir .pgdata/judge-demo` (all seven showcase files, exit 0) and an inline statement both worked.
+  Restarting through `run.py` printed the new banner.
+
+### Known issues
+* `python run.py psql [--app]` was not executed in this session (the agent's tool permissions blocked running psql). Try it
+  by hand once.
+* After a forced kill (not Ctrl+C), the next start can fail with a `pg_ctl` 10-second timeout while PostgreSQL recovers on
+  Windows; running it again works. Noted in `docs/guide/README.md`.
+* Child output is block-buffered when `run.py` runs under a pipe (an IDE preview); in a terminal it prints live.
+* `docs/guide/JUDGE_QA.md` Q5 defers the exact SDG targets and TRL to SUBMISSION.md; check that they match before presenting.
+
+### Next step
+Ask the user before pushing `main` (origin is at `a3db1b4`) and before committing these changes. Then M6-05 and the backlog
+(automated browser tests first).
+
+---
+
 ## 2026-10-07 · Audit hardening, preserved decisions and presentation evidence
 
 **State:** original foundation extended on `feat/audit-hardening-and-evaluation`, with three new forward migrations,
