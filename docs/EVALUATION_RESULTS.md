@@ -32,7 +32,7 @@ ZeroEntry = alerts persisted by `scan_shadow_entries()`; naive = the proposal's 
 | `machine_failed_only` | the only machine deployment FAILED | 20 | yes | 20 | 20 |
 | `entrant_not_logged` | lawful permit closed, but one entrant has no entry log | 20 | yes | 20 | 0 |
 
-**Late paperwork** (20 complaints resolved with no evidence; a CLEARED machine log is recorded 30 h later, after the first scan): ZeroEntry kept **20** for human review (`EVIDENCE_RECEIVED`, invoice still held); the naive query silently dropped **20** from its list.
+**Late paperwork** (20 invoiced complaints resolved with no evidence; a CLEARED machine log is recorded 30 h later, after the first scan): ZeroEntry kept **20** for human review (`EVIDENCE_RECEIVED`) with **20** of their invoices still held; the naive query silently dropped **20** from its list and holds nothing.
 
 ## E2 Enforcement (one invalid write per rule, any client)
 
@@ -43,17 +43,17 @@ Baseline = the same schema and constraints with every rule trigger disabled (`da
 | BR-01 | Draft a permit for a job that has no written mechanisation waiver | refused, `ZE002`: No entry permit without a written mechanisation waiver for the job (mechanised cleaning comes first) | **accepted** |
 | BR-02 | File a MACHINE_FAILED waiver when no machine has failed on the complaint | refused, `ZE002`: Reason MACHINE_FAILED needs a recorded FAILED machine deployment for this complaint | **accepted** |
 | BR-03 | Authorise a permit whose crew has no standby (raw UPDATE) | refused, `ZE001`: Entry denied. Unmet legal clauses: - A standby (top man) who does not enter: 0 standby (top man) assigned | **accepted** |
-| BR-04 | Authorise with an entrant whose medical fitness has expired | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every crew member is medically fit and trained on the day: NAM-T-00484: medical fitness expired on 2020 | **accepted** |
-| BR-05 | Authorise a job whose contractor is blacklisted | refused, `ZE001`: Entry denied. Unmet legal clauses: - Contractor is ACTIVE with a valid licence: Contractor Contractor 490 is BLACKLISTED | **accepted** |
-| BR-06 | Authorise when an entrant has no breathing apparatus | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every entrant holds every statutory protective-gear item: NAM-T-00506 missing: Breathing apparatus (SCB | **accepted** |
+| BR-04 | Authorise with an entrant whose medical fitness has expired | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every crew member is medically fit and trained on the day: NAM-T-00504: medical fitness expired on 2020 | **accepted** |
+| BR-05 | Authorise a job whose contractor is blacklisted | refused, `ZE001`: Entry denied. Unmet legal clauses: - Contractor is ACTIVE with a valid licence: Contractor Contractor 510 is BLACKLISTED | **accepted** |
+| BR-06 | Authorise when an entrant has no breathing apparatus | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every entrant holds every statutory protective-gear item: NAM-T-00526 missing: Breathing apparatus (SCB | **accepted** |
 | BR-07 | Authorise after the latest BOTTOM reading showed H2S at 25 ppm | refused, `ZE001`: Entry denied. Unmet legal clauses: - BOTTOM atmosphere tested recently, by a calibrated detector, within limits: H2S 25.00 ppm is not below  | **accepted** |
 | BR-08 | Insert a permit that is born AUTHORISED | refused, `ZE003`: A permit is created as DRAFT; AUTHORISED is reachable only through the clause gate | **accepted** |
 | BR-09 | Add an un-geared entrant to an authorised permit | refused, `ZE003`: Crew and gear are frozen once a permit is AUTHORISED (cancel and re-issue instead) | **accepted** |
 | BR-10 | Start a new entry before the required 30-minute rest after a 90-minute stretch | refused, `ZE002`: This worker must rest for 30 minutes after a 90-minute stretch; the next stretch is allowed after 2026-10-07 18:31 IST | **accepted** |
 | BR-11 | Re-open a CLOSED permit | refused, `ZE003`: A permit cannot change from CLOSED to AUTHORISED | **accepted** |
-| BR-12 | Record a gas reading from a detector whose calibration had lapsed | refused, `ZE002`: Detector GD-T-00578 calibration expired on 2020-01-01: a reading taken on 2026-09-01 is refused | **accepted** |
-| BR-22 | Give a new job to a blacklisted contractor | refused, `ZE003`: Contractor Contractor 580 is BLACKLISTED and cannot be assigned jobs | **accepted** |
-| BR-23 | Approve an invoice that is on hold | refused, `ZE003`: Invoice INV-T-00601 is on hold (SHADOW_ENTRY) and cannot be approved | **accepted** |
+| BR-12 | Record a gas reading from a detector whose calibration had lapsed | refused, `ZE002`: Detector GD-T-00598 calibration expired on 2020-01-01: a reading taken on 2026-09-01 is refused | **accepted** |
+| BR-22 | Give a new job to a blacklisted contractor | refused, `ZE003`: Contractor Contractor 600 is BLACKLISTED and cannot be assigned jobs | **accepted** |
+| BR-23 | Approve an invoice that is on hold | refused, `ZE003`: Invoice INV-T-00621 is on hold (SHADOW_ENTRY) and cannot be approved | **accepted** |
 | BR-31 | A supervisor dismisses a shadow-entry alert (only an engineer may decide) | refused, `ZE006`: Only an active ENGINEER or ADMIN may decide a shadow-entry alert | **accepted** |
 | BR-34 | Raise a second alert for the same complaint and rule | refused, `23505`: duplicate key value violates unique constraint "uq_alert_per_complaint_rule" | refused, `23505`: duplicate key value violates unique constraint "uq_alert_per_complaint_rule" |
 | BR-36 | Rewrite an alert's lifecycle history | refused, `ZE003`: shadow_entry_alert_event is append-only: UPDATE is not allowed | **accepted** |

@@ -18,7 +18,8 @@ def test_zeroentry_detection_is_exact_on_every_labelled_class_and_the_naive_anti
     assert (zero["tp"], zero["fp"], zero["fn"]) == (8, 0, 0)
     # The naive query flags retried, exempt and in-grace complaints and misses the no-job and unlogged-entrant ones.
     assert (naive["tp"], naive["fp"], naive["fn"]) == (4, 6, 4)
-    assert result["late"] == {"n": 2, "zeroentry_kept_for_review": 2, "naive_silently_cleared": 2}
+    assert result["late"] == {"n": 2, "zeroentry_kept_for_review": 2, "zeroentry_invoices_still_held": 2,
+                              "naive_silently_cleared": 2}
 
 
 def test_every_invalid_write_is_refused_by_zeroentry_and_only_the_unique_constraint_stops_the_baseline(conn):
@@ -33,7 +34,7 @@ def test_every_invalid_write_is_refused_by_zeroentry_and_only_the_unique_constra
 
 
 def test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row(conn):
-    """Migration 0011: a materialised CTE, not rule_num() inlined into the anti-join filters (12x slower scan at 100k complaints)."""
+    """Migration 0011: a materialised CTE, not rule_num() inlined into the anti-join filters (several times slower)."""
     plan = "\n".join(r["QUERY PLAN"] for r in conn.execute("EXPLAIN SELECT count(*) FROM v_shadow_candidate"))
     assert plan.count("CTE Scan on g") == 2                     # SE1 and SE2; before 0011 the CTE was inlined (no CTE Scan)
 

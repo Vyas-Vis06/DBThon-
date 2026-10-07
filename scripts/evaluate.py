@@ -173,15 +173,16 @@ def detection_accuracy(conn: psycopg.Connection, per_class: int = 20) -> dict:
     for cls, _, _ in CLASSES:
         for i in range(per_class):
             cls_of[_build(conn, f, w, cls, i)] = cls
-    late = []                                       # resolved with no evidence; a CLEARED log is recorded after scan 1
+    late = []                     # resolved with no evidence and invoiced; a CLEARED log is recorded after scan 1
     for _ in range(per_class):
         c = f.resolved_complaint(w["manhole"], T0)
-        late.append((c, f.job(c, w["contractor"])))
+        j = f.job(c, w["contractor"])
+        late.append((c, j, f.invoice(j)))
 
     naive = lambda: {r["complaint_id"] for r in conn.execute("SELECT complaint_id FROM eval_naive_shadow")}  # noqa: E731
     naive_first = naive()
     conn.execute("SELECT * FROM scan_shadow_entries(%s)", (FIRST_SCAN,))
-    for _, j in late:
+    for _, j, _ in late:
         f.deployment(j, w["machine"], "CLEARED", started_at=T0 - 3 * H, recorded_at=T0 + 30 * H)
     naive_now = naive()
     conn.execute("SELECT * FROM scan_shadow_entries(%s)", (SCAN,))
@@ -194,12 +195,15 @@ def detection_accuracy(conn: psycopg.Connection, per_class: int = 20) -> dict:
         ids = [c for c, k in cls_of.items() if k == cls]
         rows.append({"class": cls, "what": what, "n": len(ids), "expected": pos,
                      "zeroentry": sum(c in alerts for c in ids), "naive": sum(c in naive_now for c in ids)})
-    late_ids = [c for c, _ in late]
+    late_ids = [c for c, _, _ in late]
+    held = conn.execute("SELECT count(DISTINCT invoice_id) AS n FROM invoice_hold WHERE released_at IS NULL "
+                        "AND invoice_id = ANY(%s)", ([i for _, _, i in late],)).fetchone()["n"]
     return {
         "classes": rows,
         "summary": {"ZeroEntry": _scores(truth, set(alerts)), "naive": _scores(truth, naive_now)},
         "late": {"n": len(late_ids),
                  "zeroentry_kept_for_review": sum(alerts.get(c) == "EVIDENCE_RECEIVED" for c in late_ids),
+                 "zeroentry_invoices_still_held": held,
                  "naive_silently_cleared": sum(c in naive_first and c not in naive_now for c in late_ids)},
     }
 
@@ -511,10 +515,11 @@ def render(results: dict, meta: dict) -> str:
         *(f"| `{r['class']}` | {r['what']} | {r['n']} | {'yes' if r['expected'] else 'no'} | {r['zeroentry']} | {r['naive']} |"
           for r in e1["classes"]),
         "",
-        f"**Late paperwork** ({e1['late']['n']} complaints resolved with no evidence; a CLEARED machine log is recorded "
-        f"30 h later, after the first scan): ZeroEntry kept **{e1['late']['zeroentry_kept_for_review']}** for human review "
-        f"(`EVIDENCE_RECEIVED`, invoice still held); the naive query silently dropped "
-        f"**{e1['late']['naive_silently_cleared']}** from its list.",
+        f"**Late paperwork** ({e1['late']['n']} invoiced complaints resolved with no evidence; a CLEARED machine log is "
+        f"recorded 30 h later, after the first scan): ZeroEntry kept **{e1['late']['zeroentry_kept_for_review']}** for "
+        f"human review (`EVIDENCE_RECEIVED`) with **{e1['late']['zeroentry_invoices_still_held']}** of their invoices "
+        f"still held; the naive query silently dropped **{e1['late']['naive_silently_cleared']}** from its list and "
+        "holds nothing.",
         "",
         "## E2 Enforcement (one invalid write per rule, any client)",
         "",

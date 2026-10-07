@@ -10,7 +10,7 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 35 tables, new scoped read endpoints and presentation screens. Original migrations 0001–0011 remain unchanged.
 Initial audit version, before the concurrent M6 integration: **568 passed in 30.21 seconds**, macOS, Python 3.12.11,
 embedded PostgreSQL 16.2. All six CI jobs passed on `28b8bee`, including PostgreSQL service and all five OS/Python jobs.
-The integrated release's full-suite result is recorded below after the final run.
+Integrated validation before the final upstream invoice-measurement refresh: **574 passed in 34.34 seconds**.
 Branch CI is configured for the original five OS/Python jobs and a separate PostgreSQL 16 service; see Actions for its
 current result. The release is for review, not an automatic merge or a production safety certification.
 
@@ -27,7 +27,7 @@ current result. The release is for review, not an automatic merge or a productio
   that a failed scan cannot roll back an already committed stop.
 * Built and separately installed wheel passes shell/JS/CSS smoke checks. No new application dependency added.
 * Synthetic SE1 evaluation at 1k/10k/100k complaints, seven query samples per scale, raw plans/counts/confusion matrices
-  and source hashes. The saved 100k run measured 451.00 ms p50 and 627.16 ms p95 for SE1 and 4326.30 ms for first scan.
+  and source hashes. The saved 100k run measured 138.31 ms p50 and 140.57 ms p95 for SE1 and 2435.54 ms for first scan.
   Six synthetic labels classify as expected; this is not field accuracy or an equal-task speedup claim.
 * Fresh isolated local demo: expected five initial alerts; UI denial with five reasons; completed crew/gear through API;
   simulator-authorized safe readings; an open entry; low-oxygen stop; browser-recorded exit after stop; three retained
@@ -43,7 +43,10 @@ The main `scripts/evaluate.py` is retained and adapted to truthful historical re
 probe; `scripts/evaluate_temporal.py` is the supplementary SE1 finalization experiment. The unmaterialized comparison
 retains final temporal semantics. Runtime draft authorization now also requires READ COMMITTED to prevent stale worker
 credentials in repeatable-read snapshots, with regressions for function and raw UPDATE. Source provenance includes the
-official 20 January 2026 compensation clarification. Final integrated measurements and full-suite validation follow.
+official 20 January 2026 compensation clarification. Both integrated evaluators completed on committed `f819d5f`. Main M6 measured a 1.7 ms median decision and a
+256.3 ms median persisted scan at 100,001 complaints. Its separate history workload differs from the supplementary
+100,000-complaint temporal workload. New upstream `72dc6d1` also adds an explicit held-invoice count for late paperwork;
+this is retained, with final validation recorded in the review handoff.
 
 ### Handoff
 
@@ -68,14 +71,16 @@ and no TRL statement.
   triggers disabled, and E3 decision and scan latency at 1k, 10k and 100k complaints, with and without indexes and before
   `0011`. Baselines and the history generator are in `database/evaluation/` (never migrations). It writes
   `docs/EVALUATION_RESULTS.md` (generated; do not edit).
-* **Results (2026-10-07):** E1 precision and recall 100 %/100 % vs 40 %/50 %; late paperwork 20/20 kept for review vs 20/20
-  silently dropped; E2 18/18 refused vs 1/18; E3 decision 1.7 ms median and about 50 buffers, flat from 1k to 100k (12 ms without
-  its indexes); full scan 735 ms at 100k.
+* **Results (2026-10-07):** E1 precision and recall 100 %/100 % vs 40 %/50 %; late paperwork 20/20 kept for review with their
+  invoices held vs 20/20 silently dropped; E2 18/18 refused vs 1/18; E3 decision about 2 ms median and about 50 buffers, flat
+  from 1k to 100k; full scan under a second at 100k. Exact figures only in `docs/EVALUATION_RESULTS.md`; hand-written docs
+  round them so a rerun does not make them wrong.
 * **Migration `0011`** (found by the first evaluation run): the detection views' one-row parameter CTE was inlined by PostgreSQL,
-  so `rule_num()` ran once per joined row. `WITH g AS MATERIALIZED` makes the scan 12x faster at 100k (8.9 s to 735 ms) with
-  identical results. ADR-013; `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`.
+  so `rule_num()` ran once per joined row. `WITH g AS MATERIALIZED` makes the candidate query about 4x faster with 2.7x fewer
+  buffers (stable across runs) and the scan 4x to 6x faster across sizes, with identical results. ADR-013; `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`.
 * **Benchmark pitfall found and fixed:** with one warm-up, whichever variant ran first looked slower (PL/pgSQL re-plans for the
-  first five calls of a session). `_timed()` now warms up six times; the first full run's E3b numbers were discarded.
+  first five calls of a session). `_timed()` now warms up six times; the first full run's E3b numbers were discarded. The
+  results were then regenerated on the committed code, so the commit they name contains `evaluate.py`.
 * **Docs:** `docs/EVALUATION.md` (method, baselines, headline table, limits), `docs/SUBMISSION.md` (the brief's eight components,
   five-step novelty for the three innovations, rubric map, SDG 8.8 / 3.9 / 6.2 / 16.6 with wording checked on sdgs.un.org, TRL 4
   and the path to 5-6, proposal vs as-built). README, AGENTS (where things live, read-first item 5), ROADMAP (M6), ARCHITECTURE,
@@ -87,6 +92,21 @@ and no TRL statement.
 `python scripts/evaluate.py` (full run, default sizes): completed, results in `docs/EVALUATION_RESULTS.md`.
 
 ### Known issues
+* **Historical integration instructions, resolved by this audit release.** PR #1 was written
+  in parallel with this entry. Whoever merges it must:
+  1. **Renumber its migrations** `0011_safety_lifecycle`, `0012_temporal_evidence_invoice_serialization`,
+     `0013_policy_provenance` to `0012`-`0014` (files and `revision`/`down_revision` in `database/migrations/versions/`):
+     `main` already has `0011_detection_parameters_once`, and applied migrations are never renumbered.
+  2. **Keep `WITH g AS MATERIALIZED`** in its re-creation of `v_shadow_se1` (its `0012`): the PR copies 0007's inlined CTE,
+     which would silently undo `0011`'s fix. `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`
+     fails if it is lost.
+  3. **Two `scripts/evaluate.py`** (add/add conflict): the PR's measures SE1 as `ze_app` and writes `docs/evaluation/`; this
+     one runs E1-E3 including enforcement and writes `docs/EVALUATION_RESULTS.md`. Suggested: rename the PR's to
+     `scripts/evaluate_se1.py`, link its results from `docs/EVALUATION.md`, and rerun both after the merge.
+  4. Union the overlapping docs (README, ROADMAP, DEV_LOG, ARCHITECTURE, DATABASE_DESIGN, TESTING, ACCEPTANCE_CHECKLIST,
+     DEMO_SCRIPT), regenerate `docs/SCHEMA_REFERENCE.md`, and run the whole suite: `tests/db/test_evaluation.py` builds rows with
+     `tests/factories.py`, which the PR changes, and its stricter rules may change which SQLSTATE a probe gets (the test only
+     requires class `ZE`).
 * Timings come from one Windows laptop; counts are machine-independent. Rerun `python scripts/evaluate.py` (about 10 minutes)
   before quoting numbers from a different commit.
 * E4 (concurrency) is cited from the earlier session and `tests/db/test_concurrency.py`, not re-run without `0010`.
@@ -94,8 +114,9 @@ and no TRL statement.
 * The user's local `.pgdata` database has not been migrated by this session; `python scripts/dev.py` applies `0011` on its next start.
 
 ### Next step
-M6-05, then the backlog (automated browser tests first). For slides or a report, start from `docs/SUBMISSION.md` and quote
-numbers only from `docs/EVALUATION_RESULTS.md`.
+The audit release resolves the four integration points above. Review PR #1, then M6-05 and the
+backlog (automated browser tests first). For slides or a report, start from `docs/SUBMISSION.md` and quote numbers only from
+`docs/EVALUATION_RESULTS.md`.
 
 ---
 

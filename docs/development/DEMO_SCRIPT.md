@@ -3,7 +3,7 @@
 Use a fresh, isolated synthetic demo directory without resetting an existing database:
 
 ```bash
-python scripts/dev.py --data-dir .pgdata/presentation-release --port 8000
+python scripts/dev.py --data-dir .pgdata/presentation-final --port 8000
 ```
 
 Keep the generated password at hand. For a presentation outside 06:00–18:00 IST, an ADMIN can widen the product daylight
@@ -68,7 +68,8 @@ Show this change in policy history, and explain that astronomical daylight and r
 
 Open [EVALUATION_RESULTS.md](../EVALUATION_RESULTS.md) (summary in [EVALUATION.md](../EVALUATION.md#results)): detection
 precision and recall against the naive anti-join, 18 of 18 invalid writes refused against 1 of 18 when the rules live in
-application code, and latency at 100,000 complaints. To show it is real, run a small version live (under a minute):
+application code, and latency at 100,000 complaints. To show it is real, run a small version live (under a minute; it starts its own throwaway server, so `dev.py` can keep
+running, just as the test suite runs several embedded servers at once):
 
 ```bash
 python scripts/evaluate.py --sizes 1000 --per-class 5 --out -
