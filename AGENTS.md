@@ -55,7 +55,10 @@ Applies to Codex, Claude Code, Cursor, Copilot and humans. Keep this file short;
 
 ## Safe commands
 
-`python -m pytest -n auto` · `python scripts/dev.py` · `python scripts/gen_docs.py` · `python scripts/evaluate.py` (own
-throwaway server; rewrites `docs/EVALUATION_RESULTS.md`) · `git status`/`diff`.
+`python -m pytest -n auto` · `python scripts/dev.py` · `python scripts/gen_docs.py` ·
+`python scripts/evaluate.py --sizes 1000 --out -` (own throwaway server; prints only) · `git status`/`diff`.
+**Refreshing the published results** (`python scripts/evaluate.py` with no `--out`) rewrites `docs/EVALUATION_RESULTS.md`:
+do it on committed code, check that every count is unchanged, and update the rounded figures quoted in README, EVALUATION and
+SUBMISSION in the same commit.
 **Ask before:** `python scripts/db.py reset` (drops a database), `git push`, `git commit`, deleting files, anything
 that touches a database you did not create.

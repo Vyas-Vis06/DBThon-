@@ -17,14 +17,16 @@ and no TRL statement.
   triggers disabled, and E3 decision and scan latency at 1k, 10k and 100k complaints, with and without indexes and before
   `0011`. Baselines and the history generator are in `database/evaluation/` (never migrations). It writes
   `docs/EVALUATION_RESULTS.md` (generated; do not edit).
-* **Results (2026-10-07):** E1 precision and recall 100 %/100 % vs 40 %/50 %; late paperwork 20/20 kept for review vs 20/20
-  silently dropped; E2 18/18 refused vs 1/18; E3 decision 1.7 ms median and about 50 buffers, flat from 1k to 100k (12 ms without
-  its indexes); full scan 735 ms at 100k.
+* **Results (2026-10-07):** E1 precision and recall 100 %/100 % vs 40 %/50 %; late paperwork 20/20 kept for review with their
+  invoices held vs 20/20 silently dropped; E2 18/18 refused vs 1/18; E3 decision about 2 ms median and about 50 buffers, flat
+  from 1k to 100k; full scan under a second at 100k. Exact figures only in `docs/EVALUATION_RESULTS.md`; hand-written docs
+  round them so a rerun does not make them wrong.
 * **Migration `0011`** (found by the first evaluation run): the detection views' one-row parameter CTE was inlined by PostgreSQL,
-  so `rule_num()` ran once per joined row. `WITH g AS MATERIALIZED` makes the scan 12x faster at 100k (8.9 s to 735 ms) with
-  identical results. ADR-013; `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`.
+  so `rule_num()` ran once per joined row. `WITH g AS MATERIALIZED` makes the candidate query about 4x faster with 2.7x fewer
+  buffers (stable across runs) and the scan 4x to 12x faster across sizes, with identical results. ADR-013; `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`.
 * **Benchmark pitfall found and fixed:** with one warm-up, whichever variant ran first looked slower (PL/pgSQL re-plans for the
-  first five calls of a session). `_timed()` now warms up six times; the first full run's E3b numbers were discarded.
+  first five calls of a session). `_timed()` now warms up six times; the first full run's E3b numbers were discarded. The
+  results were then regenerated on the committed code, so the commit they name contains `evaluate.py`.
 * **Docs:** `docs/EVALUATION.md` (method, baselines, headline table, limits), `docs/SUBMISSION.md` (the brief's eight components,
   five-step novelty for the three innovations, rubric map, SDG 8.8 / 3.9 / 6.2 / 16.6 with wording checked on sdgs.un.org, TRL 4
   and the path to 5-6, proposal vs as-built). README, AGENTS (where things live, read-first item 5), ROADMAP (M6), ARCHITECTURE,

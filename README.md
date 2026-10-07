@@ -17,7 +17,7 @@ India's law defines the offence as *missing safeguards*. ZeroEntry turns that in
 
 **Measured against conventional approaches** ([EVALUATION.md](docs/EVALUATION.md), reproducible with `python scripts/evaluate.py`):
 shadow-entry detection with 100 % precision and recall on labelled cases, against 40 % and 50 % for a naive anti-join; 18 of 18
-rule-breaking writes refused, against 1 of 18 when the same rules live in application code; an entry decision in 1.7 ms whether
+rule-breaking writes refused, against 1 of 18 when the same rules live in application code; an entry decision in about 2 ms whether
 the history holds 1,000 or 100,000 complaints. How this answers the DBThon brief: [SUBMISSION.md](docs/SUBMISSION.md).
 
 ![The entry gate denying a permit, clause by clause](docs/img/entry-gate-denied.jpg)

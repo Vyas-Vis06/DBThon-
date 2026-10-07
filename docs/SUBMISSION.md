@@ -49,7 +49,7 @@ The brief's list of DBMS concepts to demonstrate (requirement e):
 | Limitation | Any client that skips that check (another app, a script, a SQL console, a buggy endpoint, two sessions racing) can record an unlawful entry; a checklist never refuses; a refusal does not say which legal clause failed. |
 | Proposed approach | The statute's safeguards are rows (`gear_item`, `rule_parameter`, `legal_clause`). `permit_clause_check()` proves each clause by relational division (every entrant × every statutory item; every depth level × a fresh, in-limit reading from a calibrated detector). The same function runs inside `authorise_entry()` and inside a `BEFORE UPDATE` trigger, and evidence changes lock the permit row. |
 | Novel component | "Authorised" is a state only the database can grant, proved the same way for every client, with the failed clause named in the refusal. The law's numbers are audited data, editable without code. |
-| Measurable benefit | E2: **18 of 18** invalid writes refused, against **1 of 18** for the same schema with its rules in application code. E4: 4 of 4 concurrency races closed (each committed before migration `0010`). E3a: a decision takes **1.7 ms** (median) and touches about 50 buffers whether the history holds 1,000 or 100,000 complaints. |
+| Measurable benefit | E2: **18 of 18** invalid writes refused, against **1 of 18** for the same schema with its rules in application code. E4: 4 of 4 concurrency races closed (each committed before migration `0010`). E3a: a decision takes about **2 ms** (median) and touches about 50 buffers whether the history holds 1,000 or 100,000 complaints. |
 
 ### B. Shadow-entry detection by absence
 
@@ -59,7 +59,7 @@ The brief's list of DBMS concepts to demonstrate (requirement e):
 | Limitation | An unrecorded entry leaves no row to query. The naive anti-join misses complaints with no job at all and closed permits with an unlogged entrant, flags exempt, retried and still-in-grace complaints, and forgets a suspicion as soon as paperwork appears late. |
 | Proposed approach | An explicit expected population anchored on the complaint; evidence counts only if it was recorded within a grace window; exempt resolutions are data; a second rule divides each closed permit's entrants by their entry logs; alerts are persisted, idempotent, decided by an engineer with a written note, and hold the contractor's invoices. |
 | Novel component | The absence of expected records as a persisted, reviewable, payment-linked alert computed inside the database. Late evidence never closes an alert on its own. |
-| Measurable benefit | E1: precision and recall **100 % / 100 %** (F1 1.00) against **40 % / 50 %** (F1 0.44) for the naive anti-join on 200 labelled complaints. Late paperwork: 20 of 20 suspicions kept for a human decision, against 20 of 20 silently dropped. E3b: a full scan of 100,000 complaints in **735 ms**, 12x faster than before migration `0011`, which this evaluation found. |
+| Measurable benefit | E1: precision and recall **100 % / 100 %** (F1 1.00) against **40 % / 50 %** (F1 0.44) for the naive anti-join on 200 labelled complaints. Late paperwork: 20 of 20 suspicions kept for a human decision with their invoices held, against 20 of 20 silently dropped. E3b: a full scan of 100,000 complaints in **under a second**; migration `0011`, which this evaluation found, made the detection query about 4x faster with 2.7x fewer buffers. |
 
 ### C. Consequences in one transaction
 
@@ -84,7 +84,7 @@ modelling the Indian statute as integrity, detection from absence, and the conse
 | 4 | Innovation | 4 | CO1, CO2 | §3 A-C |
 | 5 | Novelty and differentiation | 5 | CO2 | §3 five-step tables; [proposal §5](proposal/ZeroEntry_DBThon2026_Proposal.md#5-novelty-and-prior-art) (prior art) |
 | 6 | SDG alignment and societal impact | 2 | CO2 | §5 |
-| 7 | Validation and measurable improvement | 3 | CO1, CO2 | [EVALUATION](EVALUATION.md): E1-E4 against stated baselines, and the 6x scan improvement the evaluation itself found (migration `0011`) |
+| 7 | Validation and measurable improvement | 3 | CO1, CO2 | [EVALUATION](EVALUATION.md): E1-E4 against stated baselines, and the detection speed-up the evaluation itself found (migration `0011`) |
 | 8 | TRL and demonstration | 2 | CO1, CO2 | §6; [DEMO_SCRIPT](development/DEMO_SCRIPT.md) |
 
 ## 5. SDG alignment and societal impact

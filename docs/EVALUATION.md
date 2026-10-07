@@ -57,34 +57,36 @@ work. "Before 0011" and "without indexes" re-create the old views or drop the in
 
 ## Results
 
-Run of 2026-10-07 on one Windows laptop (22 logical CPUs), embedded PostgreSQL 16.2 with default settings. Every number below
-is copied from [EVALUATION_RESULTS.md](EVALUATION_RESULTS.md), which also has the per-class and per-rule tables.
+Run of 2026-10-07 on one Windows laptop (22 logical CPUs), embedded PostgreSQL 16.2 with default settings. Counts below are
+exact; times are rounded from [EVALUATION_RESULTS.md](EVALUATION_RESULTS.md) (which has the exact figures and the per-class and
+per-rule tables), because they move a little from run to run and machine to machine.
 
 | | ZeroEntry | Conventional baseline | Improvement |
 |---|---|---|---|
 | **E1** detection, 200 labelled complaints | precision 100 %, recall 100 %, F1 1.00 | naive anti-join: precision 40 %, recall 50 %, F1 0.44 | 60 false alarms and 40 missed shadow entries removed |
-| **E1** late paperwork, 20 cases | 20 kept for human review, invoices still held | 20 silently dropped from the list | no suspicion disappears without a decision |
+| **E1** late paperwork, 20 invoiced cases | 20 kept for human review, all 20 invoices still held | 20 silently dropped from the list | no suspicion disappears without a decision |
 | **E2** invalid writes refused | 18 of 18 | 1 of 18 (only the `UNIQUE` constraint both designs share) | 17 rule violations that any non-UI client could commit are refused |
-| **E3a** entry decision, 1k to 100k complaints | 1.9 ms to 1.7 ms median; 41 to 51 buffers | without its indexes: 12.0 ms at 100k | the cost of a decision does not grow with history |
-| **E3b** detection candidate query, 100k complaints | 334 ms, 56,897 buffers | without its indexes: 37,064 ms, 7.8 million buffers | 111x faster, 137x less data processed |
-| **E3b** full absence scan, 100k complaints | 735 ms | the same views before migration `0011`: 8,854 ms | 12x faster; found by this evaluation |
+| **E3a** entry decision, 1k to 100k complaints | about 2 ms median and about 50 buffers at every size | without its indexes: several times slower at 100k, and growing | the cost of a decision does not grow with history |
+| **E3b** detection candidate query, 100k complaints | about 0.3 s, about 57,000 buffers | without its indexes: tens of seconds, about 7.8 million buffers | about 100x faster, over 100x less data processed |
+| **E3b** detection before and after migration `0011`, 100k complaints | candidate query about 0.3 s; full scan under a second | the same views before `0011`: about 4x longer and 2.7x more buffers; full scan several seconds | found by this evaluation; scan 4x to 12x faster across sizes |
 | **E4** concurrent races that commit a broken proof | 0 of 4 | before migration `0010`: 4 of 4 | the gate is race-free |
 
 Reading the numbers:
 
 * **Where the naive query goes wrong (E1).** It flags complaints whose first machine failed and a second one cleared, exempt
   resolutions, and complaints still inside the grace window. It misses complaints resolved with no job at all and closed
-  permits whose entrant never logged an entry. At 100,000 complaints it is cheaper (84 ms) but flags 4,751 complaints where
+  permits whose entrant never logged an entry. At 100,000 complaints it is cheaper but flags 4,751 complaints where
   1,900 are real candidates: the extra 2,851 are exactly the exempt resolutions in the history.
 * **What the baseline still refuses (E2).** Only the duplicate alert, because `UNIQUE` is part of the shared schema. Every other
   rule is a trigger or a function in ZeroEntry; without them the same tables accept an authorised permit with no standby, a
   95-minute entry, a re-opened closed permit, a deleted audit row, and the rest of the list.
 * **Scalability (E3).** The decision touches about 50 buffers whatever the size of the history, because every clause is an
-  index lookup on one permit. The scan grows linearly with history (10 ms, 82 ms, 735 ms at 1k, 10k, 100k) because it
-  re-evaluates every resolved complaint; without its indexes it grows much faster than linearly.
+  index lookup on one permit. The scan grows linearly with history (about ten times the time for ten times the complaints)
+  because it re-evaluates every resolved complaint; without its indexes it grows much faster than linearly.
 * **The evaluation found a real defect (0011).** The first run showed the detection views calling `rule_num()` once per joined
-  row: PostgreSQL 12+ inlines a CTE that is referenced once. Materialising it makes the candidate query 4.2x faster with 2.7x
-  fewer buffers and the scan 4x to 12x faster, with identical results (`rule_num()` is `STABLE`). A test now checks the plan
+  row: PostgreSQL 12+ inlines a CTE that is referenced once. Materialising it makes the candidate query about 4x faster with
+  about 2.7x fewer buffers (the same ratio in every run so far), with identical results (`rule_num()` is `STABLE`). The full
+  scan gained 4x to 12x across sizes in the published run; the exact factor depends on the plan PL/pgSQL settles on. A test now checks the plan
   keeps the CTE ([ADR-013](decisions/README.md#adr-013--measure-against-a-stated-baseline-read-rule-parameters-once-per-statement-migration-0011)).
 * **E4** is not re-run by the script: `tests/db/test_concurrency.py` reproduces the four races, and the 2026-10-07 build
   session recorded each of them committing before `0010` and being refused after ([DEV_LOG](development/DEV_LOG.md)).
@@ -99,6 +101,6 @@ Reading the numbers:
   check, but every other client would not, which is what E2 measures.
 * **One machine, default settings.** Timings come from one development laptop running the embedded PostgreSQL 16 with default
   settings, warm cache, one session. Buffers and counts transfer to other machines better than milliseconds do.
-* **The scan is a full pass.** It re-evaluates every resolved complaint each time (idempotent, simple, about 0.7 s at 100,000
+* **The scan is a full pass.** It re-evaluates every resolved complaint each time (idempotent, simple, under a second at 100,000
   complaints). If volumes ever make that too slow, the upgrade path is an incremental scan fed by a change queue.
 * **Outcomes.** Nothing here measures deaths prevented; that needs a deployment.
