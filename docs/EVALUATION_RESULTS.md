@@ -4,11 +4,11 @@
 
 | Run | |
 |---|---|
-| Date | 2026-10-07 11:50 UTC |
+| Date | 2026-10-07 12:32 UTC |
 | Command | `python scripts/evaluate.py` |
-| Commit | `e863269` (plus uncommitted changes, if any) |
-| Machine | Windows 10, 22 logical CPUs, AMD64 |
-| Python / PostgreSQL | 3.11.2 / 16.2 (embedded, default settings) |
+| Commit | `f819d5f` (plus uncommitted changes, if any) |
+| Machine | Darwin 27.0.0, 10 logical CPUs, arm64 |
+| Python / PostgreSQL | 3.12.11 / 16.2 (embedded, default settings) |
 
 ## E1 Detection accuracy (labelled synthetic complaints)
 
@@ -36,7 +36,7 @@ ZeroEntry = alerts persisted by `scan_shadow_entries()`; naive = the proposal's 
 
 ## E2 Enforcement (one invalid write per rule, any client)
 
-Baseline = the same schema and constraints with every rule trigger disabled (`database/evaluation/rules_in_app_code.sql`): the rules live in application code, so any other client (a script, a second app, a SQL console, a buggy endpoint) is unconstrained.
+Baseline = the same schema and constraints with every rule trigger disabled (`database/evaluation/rules_in_app_code.sql`): the rules live in application code, so any other client (a script, a second app, a SQL console, a buggy endpoint) would not run those checks.
 
 | Rule | Invalid write | ZeroEntry | Baseline (rules in app code) |
 |---|---|---|---|
@@ -49,7 +49,7 @@ Baseline = the same schema and constraints with every rule trigger disabled (`da
 | BR-07 | Authorise after the latest BOTTOM reading showed H2S at 25 ppm | refused, `ZE001`: Entry denied. Unmet legal clauses: - BOTTOM atmosphere tested recently, by a calibrated detector, within limits: H2S 25.00 ppm is not below  | **accepted** |
 | BR-08 | Insert a permit that is born AUTHORISED | refused, `ZE003`: A permit is created as DRAFT; AUTHORISED is reachable only through the clause gate | **accepted** |
 | BR-09 | Add an un-geared entrant to an authorised permit | refused, `ZE003`: Crew and gear are frozen once a permit is AUTHORISED (cancel and re-issue instead) | **accepted** |
-| BR-10 | Log a 95-minute continuous entry | refused, `ZE002`: An entry of 95 minutes exceeds the 90 minute continuous-work limit | **accepted** |
+| BR-10 | Start a new entry before the required 30-minute rest after a 90-minute stretch | refused, `ZE002`: This worker must rest for 30 minutes after a 90-minute stretch; the next stretch is allowed after 2026-10-07 18:31 IST | **accepted** |
 | BR-11 | Re-open a CLOSED permit | refused, `ZE003`: A permit cannot change from CLOSED to AUTHORISED | **accepted** |
 | BR-12 | Record a gas reading from a detector whose calibration had lapsed | refused, `ZE002`: Detector GD-T-00578 calibration expired on 2020-01-01: a reading taken on 2026-09-01 is refused | **accepted** |
 | BR-22 | Give a new job to a blacklisted contractor | refused, `ZE003`: Contractor Contractor 580 is BLACKLISTED and cannot be assigned jobs | **accepted** |
@@ -61,6 +61,8 @@ Baseline = the same schema and constraints with every rule trigger disabled (`da
 
 **Refused: ZeroEntry 18/18, baseline 1/18.** SQLSTATE class `ZE` is a ZeroEntry rule (trigger or function); `23xxx` is a declarative constraint that both designs share.
 
+These synthetic probes measure database rejection of the listed write shapes. They do not prove that reported event times are physically accurate, authenticate a worker, or establish detector/sensor authenticity. The evaluation uses the database owner for controlled fixture imports; a privileged database owner or superuser can alter data or disable triggers in either design.
+
 ## E3 Performance and scalability (history grows)
 
 Every measurement is rolled back, so each repetition does the same work. Times in ms; buffers = shared blocks touched, from `EXPLAIN (ANALYZE, BUFFERS)` (the amount of data processed). "Before 0011" and "without indexes" are measured on the same data, inside a transaction that is rolled back.
@@ -69,14 +71,14 @@ Every measurement is rolled back, so each repetition does the same work. Times i
 
 | Complaints | Permits | Gas readings | Decision median | Decision p95 | Without gate indexes (median) | Clause check buffers |
 |---|---|---|---|---|---|---|
-| 1,001 | 51 | 153 | 1.9 | 2.5 | 1.9 | 41 |
-| 10,001 | 501 | 1,503 | 1.7 | 2.4 | 2.6 | 50 |
-| 100,001 | 5,001 | 15,003 | 1.7 | 2.1 | 12.0 | 51 |
+| 1,001 | 51 | 153 | 1.8 | 1.9 | 1.7 | 41 |
+| 10,001 | 501 | 1,503 | 1.7 | 1.8 | 2.4 | 50 |
+| 100,001 | 5,001 | 15,003 | 1.7 | 2.0 | 9.9 | 50 |
 
 ### E3b Detection by absence (`scan_shadow_entries()` and the candidate query)
 
 | Complaints | Scan median / p95 | Scan before 0011 (median) | Candidate query ms / buffers | Before 0011 | Without scan indexes | Naive query ms / buffers | Naive flagged | ZeroEntry candidates |
 |---|---|---|---|---|---|---|---|---|
-| 1,001 | 10.5 / 12.9 | 43.7 | 3.9 / 491 | 14.3 / 1,483 | 6.5 / 1,043 | 0.7 / 37 | 48 | 19 |
-| 10,001 | 82.0 / 86.7 | 374.3 | 27.6 / 5,937 | 137.1 / 15,443 | 405.3 / 80,659 | 7.6 / 361 | 476 | 190 |
-| 100,001 | 734.7 / 783.1 | 8,854.1 | 334.5 / 56,897 | 1,417.3 / 152,142 | 37,064.0 / 7,814,993 | 84.3 / 16,064 | 4,751 | 1,900 |
+| 1,001 | 3.1 / 3.2 | 8.1 | 0.9 / 568 | 2.5 / 1,548 | 2.7 / 1,120 | 0.3 / 50 | 48 | 19 |
+| 10,001 | 25.0 / 25.3 | 78.7 | 8.0 / 6,737 | 24.8 / 16,243 | 186.1 / 86,657 | 2.5 / 490 | 476 | 190 |
+| 100,001 | 256.3 / 278.3 | 907.8 | 85.1 / 70,689 | 260.0 / 165,730 | 18,361.5 / 8,413,671 | 19.4 / 17,964 | 4,751 | 1,900 |
