@@ -4,21 +4,22 @@
 
 **A default-deny database for sewer-entry safety, with shadow-entry detection by absence.** DBThon 2026 · VIT SCOPE · BCSE302P.
 
-India's law defines the offence as *missing safeguards*. ZeroEntry turns that into database integrity:
+ZeroEntry links a municipal complaint/job record to database-owned permit decisions and reviewable evidence gaps.
 
-* **Zero-entry (preventive).** A permit to enter a sewer becomes `AUTHORISED` only when relational division proves every
-  statutory safeguard has a matching record: gear for every entrant, fresh in-limit gas readings at all three depths from a
-  calibrated detector, a full crew with distinct roles, a written reason why no machine can do the job. Any unmet clause refuses
-  the entry **for every client, including a raw SQL `UPDATE` and concurrent sessions**, and names the clause that failed.
-* **Shadow-entry (detective).** An entry nobody recorded cannot be seen, so anti-joins look for the records a lawful clearance
-  would have left. Alerts are persisted, idempotent, reviewable, never closed by late paperwork, and hold the contractor's invoices.
-* **Consequences are one transaction.** A fatality opens a ₹30-lakh compensation case with a deadline, blacklists the contractor,
-  stops the job's permits and holds its invoices, all or nothing.
+* A permit becomes `AUTHORISED` only when all 11 configured clauses pass. Per-entrant gear division, depth-specific gas
+  checks and a distinct crew explain each denial. New entry admission rechecks current conditions. Unsafe readings,
+  revoked credentials and periodic expiry sweeps stop permits while preserving physical exits and violation evidence.
+* SE1/SE2 detect missing expected evidence with resolution exemptions and a grace window. A machine outcome has its own
+  server receipt time. Late evidence needs human review, and alerts create source-specific invoice holds.
+* Invoice/payment locks and atomic incident consequences keep recorded financial decisions consistent. Immutable policy
+  history and authorization snapshots preserve which values, citations and evidence supported a decision.
 
-**Measured against conventional approaches** ([EVALUATION.md](docs/EVALUATION.md), reproducible with `python scripts/evaluate.py`):
-shadow-entry detection with 100 % precision and recall on labelled cases, against 40 % and 50 % for a naive anti-join; 18 of 18
-rule-breaking writes refused, against 1 of 18 when the same rules live in application code; an entry decision in about 2 ms whether
-the history holds 1,000 or 100,000 complaints. How this answers the DBThon brief: [SUBMISSION.md](docs/SUBMISSION.md).
+This is a tested software prototype over synthetic records. Source metadata separates law, court direction, guidance
+and product policy. The seeded gear applicability, delegated approval, compensation defaults and physical response need
+operator/domain review. [Policy and prior art](docs/POLICY_AND_PRIOR_ART.md) bounds the novelty claim.
+
+The upstream M6 evaluation and this release’s temporal evidence evaluation use stated synthetic baselines.
+See [EVALUATION.md](docs/EVALUATION.md) for current measurements and [SUBMISSION.md](docs/SUBMISSION.md) for the rubric map.
 
 ![The entry gate denying a permit, clause by clause](docs/img/entry-gate-denied.jpg)
 
@@ -48,16 +49,16 @@ python -m pytest -n auto               # about 500 tests in about 2 minutes; eac
 
 | Area | What | Verified by |
 |---|---|---|
-| Schema | 30 tables, 53 foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 11 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
-| Entry gate | relational division over gear and gas depths, state machine, freeze, 90-minute / daylight / overlap rules, race-free under concurrency | `tests/db/test_entry_gate.py`, `test_entry_rules.py`, `test_concurrency.py` |
+| Schema | 35 tables, enforced foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 14 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
+| Entry gate | division, immutable parents, current admission, 90-minute stretches/30-minute rest, stop/exit events and tested concurrent decisions | `tests/db/test_entry_gate.py`, `test_entry_rules.py`, `test_concurrency.py` |
 | Detection by absence | SE1 / SE2 anti-joins, grace window, idempotent scan, review with history, invoice holds with provenance | `tests/db/test_detection.py` (the six scenarios) |
 | Consequences | `record_incident()` procedure, compensation payments, holds | `tests/db/test_consequences.py` |
-| API | FastAPI, 100 operations, sessions, CSRF, lockout, six roles, row-level security | `tests/api/` (every endpoint × every role), `tests/db/test_rls.py` |
+| API | FastAPI, guarded operations, sessions, CSRF, lockout, six roles, scoped decision/event reads and row-level security | `tests/api/` (every endpoint × every role), `tests/db/test_rls.py` |
 | UI | no-build browser UI, strict CSP | walked through by hand; `tests/api/test_web.py` (no headless-browser tests) |
 | SQL showcase | joins, aggregates, search, division, anti-join, views, transactions, trigger refusals | `database/queries/`, each file run by `tests/db/test_demo_queries.py` |
 | Evaluation | accuracy, enforcement and latency against stated baselines, at up to 100,000 complaints | `python scripts/evaluate.py` ([EVALUATION.md](docs/EVALUATION.md)); counts asserted by `tests/db/test_evaluation.py` |
 
-CI runs the whole suite on Linux and Windows (Python 3.11 and 3.12) and macOS (Python 3.12).
+CI runs the suite on Linux/Windows (Python 3.11/3.12), macOS (3.12), and a disposable PostgreSQL 16 service. A separate installed-wheel smoke checks the HTML/JS/CSS distribution.
 
 ## Repository map
 
@@ -79,12 +80,13 @@ CI runs the whole suite on Linux and Windows (Python 3.11 and 3.12) and macOS (P
 | [docs/EVALUATION.md](docs/EVALUATION.md) · [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) | how ZeroEntry is measured against conventional approaches · the generated numbers |
 | [PROJECT_SPEC.md](PROJECT_SPEC.md) | the problem, roles, business rules (`BR-nn`) and assumptions (`A-nn`) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components and the life of a request |
-| [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) · [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md) | why the schema looks like this (3NF analysis, gate, detection, locking) · four ER diagrams |
+| [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) · [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md) | why the schema looks like this (3NF analysis, gate, detection, locking) · ER diagrams |
 | [docs/API_SPEC.md](docs/API_SPEC.md) | conventions, errors, and every endpoint with the roles allowed to call it |
 | [docs/SETUP.md](docs/SETUP.md) · [docs/TESTING.md](docs/TESTING.md) | running it (embedded or a real PostgreSQL) · the test harness and what it proves |
 | [SECURITY.md](SECURITY.md) | threat model, controls and the tests behind them, known limits |
 | [docs/decisions/](docs/decisions/README.md) | architecture decision records |
 | [ROADMAP.md](ROADMAP.md) · [docs/development/DEV_LOG.md](docs/development/DEV_LOG.md) | what is done and next · the latest state |
+| [docs/development/AUDIT_RELEASE.md](docs/development/AUDIT_RELEASE.md) | audit findings, implemented corrections and handoff |
 
 ## Working on it (friends and their coding agents)
 
@@ -94,9 +96,20 @@ CI runs the whole suite on Linux and Windows (Python 3.11 and 3.12) and macOS (P
   docs/development/DEV_LOG.md, then <task>. Run the whole test suite and report the real result."*
 * The database is the authority: rules go in a new migration with a pass **and** a fail test, never only in Python.
 
+## Evaluation and presentation
+
+```bash
+python scripts/evaluate_temporal.py --sizes 1000 10000 100000 --repeats 7
+```
+
+The [measured results](docs/evaluation/RESULTS.md) include synthetic precision/recall, query latency, persisted scan cost
+and raw EXPLAIN plans. The baseline intentionally lacks temporal/applicability semantics, so it is not an equal-task
+performance comparison. [Presentation brief](docs/development/PRESENTATION_BRIEF.md) supplies the problem, prior art,
+contribution, evaluation limits and demonstration sequence.
+
 ## Before presenting
 
-* The 2013 Rules' numbering and gear schedule are cited by name and must be verified against the Gazette; the statistics quoted
-  in PROJECT_SPEC §2 must be re-checked against their sources. Ten engineering assumptions are flagged in
-  [PROJECT_SPEC.md §6](PROJECT_SPEC.md#6-assumptions-explicit-configurable-to-be-confirmed).
+* Selected clauses have source/classification/applicability records. The configured gate is not a complete legal checklist.
+  Avoid unreverified headline death statistics. Sources and assumptions are in
+  [PROJECT_SPEC.md](PROJECT_SPEC.md) and [POLICY_AND_PRIOR_ART.md](docs/POLICY_AND_PRIOR_ART.md).
 * All demo data is synthetic; no real person, contractor or licence is represented.

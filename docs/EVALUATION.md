@@ -1,107 +1,83 @@
 # Evaluation
 
-**Authoritative for:** how ZeroEntry is measured against conventional approaches: what is compared, the baselines, the
-metrics, the headline results and what they do not prove. The full generated tables are in
-[EVALUATION_RESULTS.md](EVALUATION_RESULTS.md); how this answers the DBThon brief is in [SUBMISSION.md](SUBMISSION.md).
+**Authoritative for:** how ZeroEntry is measured against stated baselines, what the measurements mean and what they do not
+prove. The generated tables and run metadata are in [EVALUATION_RESULTS.md](EVALUATION_RESULTS.md); the supplementary
+temporal experiment is in [evaluation/RESULTS.md](evaluation/RESULTS.md). How this answers the DBThon brief is in
+[SUBMISSION.md](SUBMISSION.md). Results apply to the exact code, data and machine identified in each run; do not carry old
+latencies or metrics forward after a code or fixture change.
 
 ## Reproduce
 
 ```bash
-python scripts/evaluate.py                                   # full run, about 10 minutes; rewrites docs/EVALUATION_RESULTS.md
-python scripts/evaluate.py --sizes 1000 --per-class 5 --out -   # quick look (under a minute), printed only
+python scripts/evaluate.py                                   # full run; rewrites docs/EVALUATION_RESULTS.md
+python scripts/evaluate.py --sizes 1000 --per-class 5 --out - # small run; printed only
 ```
 
 The script starts its own throwaway embedded PostgreSQL in a temporary directory, migrates it through the normal Alembic path
-and deletes it at the end. It never touches `.pgdata` or any other database. All data is synthetic and goes through every
-constraint and trigger (rows are built by `tests/factories.py` and by `eval_add_history()`, nothing is bypassed).
+and deletes it at the end. It never touches `.pgdata` or any other database. All data is synthetic. Rows are built by
+`tests/factories.py` and `eval_add_history()` through the gate; narrowly scoped, owner-only receipt backfills import
+historical examples after those checks. The live runtime cannot supply these receipts. The E2 baseline deliberately
+disables selected rule triggers in rolled-back experiments to measure the stated comparison.
 `tests/db/test_evaluation.py` runs the same code at a tiny scale on every CI run and asserts the counts, never the timings.
 
 ## What is compared
 
 | | Question | ZeroEntry | Conventional baseline | Metric |
 |---|---|---|---|---|
-| E1 | Does detection by absence find the unrecorded entries, and only those? | `scan_shadow_entries()` (SE1 + SE2, grace window, exemptions as data, persisted alerts) | the anti-join the team's own proposal first wrote ([proposal §6.3c](proposal/ZeroEntry_DBThon2026_Proposal.md#63-the-four-signature-queries)): job-anchored, no exemptions, no grace window, any closed permit counts | precision, recall, F1 on labelled complaints; suspicions silently dropped when late paperwork appears |
-| E2 | Does the law hold for every client, not just the UI? | the full schema | the same tables and constraints with every rule trigger disabled ([`rules_in_app_code.sql`](../database/evaluation/rules_in_app_code.sql)): the usual design in which rules live in application code | invalid writes refused, out of one per database-enforced rule |
-| E3 | Does it stay fast as history grows, and do the indexes earn their place? | `authorise_entry()` and `scan_shadow_entries()` at 1k, 10k and 100k complaints | the same queries without their indexes; the detection views as they were before migration `0011`; the naive query | median and p95 latency; shared buffers touched (`EXPLAIN (ANALYZE, BUFFERS)`), the "unnecessary data processing" measure |
-| E4 | Is the gate race-free? | migration `0010` (`lock_permit()`) | the guards before `0010` | concurrent races that commit a broken proof (`tests/db/test_concurrency.py`) |
+| E1 | Do the configured detection rules identify labelled missing-clearance evidence states? | `scan_shadow_entries()` (SE1 + SE2, grace window, exemptions as data, persisted alerts) | the job-anchored anti-join in the team's original proposal ([proposal §6.3c](proposal/ZeroEntry_DBThon2026_Proposal.md#63-the-four-signature-queries)) | precision, recall and F1 against synthetic evidence-gap labels; handling of late evidence |
+| E2 | Do selected database invariants refuse invalid writes that bypass the UI? | the full schema and database guards | the same schema with the rule triggers disabled ([`rules_in_app_code.sql`](../database/evaluation/rules_in_app_code.sql)) | refusal outcome for each invalid write probe |
+| E3 | How do these operations scale on the generated history, and what work do indexes/materialized parameters avoid? | `authorise_entry()` and `scan_shadow_entries()` at increasing synthetic history sizes | the same query logic without selected indexes; the semantically equivalent detection view without the M6 materialized parameter CTE; the stated naive query | median/p95 latency and shared buffers (`EXPLAIN (ANALYZE, BUFFERS)`) |
+| E4 | Do the tested concurrent writes preserve permit invariants? | current entry gate and permit-locking implementation | the pre-lock race cases recorded in the tests and development log | whether the tested races can commit an inconsistent authorization/evidence state |
 
 ### E1 method
 
-Ten classes of resolved complaints, 20 of each, with the right answer known by construction (the table in the results file
-lists them): machine cleared; retried after a failed machine; evidence synced late but inside the 24 h grace window; a lawful
-manual entry; an exempt resolution (`NO_BLOCKAGE_FOUND` and the like); resolved two hours before the scan; and four kinds that
-should alert: no evidence, no job at all, only a failed machine, a closed permit with an entrant who never logged an entry.
-A first scan runs 25 h after resolution and a second at 48 h. A further 20 complaints get a CLEARED machine log 30 h after
-resolution, between the two scans: that tests whether late paperwork can make a suspicion disappear without a human decision.
+The generator creates labelled complaint/evidence cases for timely evidence, retries, exempt resolutions, the grace window,
+missing evidence, absent jobs, failed-only deployments and entrants without logs. It also adds late evidence between scans.
+The generated tables list the actual class counts and confusion matrices. A label is the expected result under the configured
+evidence rules; it is not ground truth about whether a worker physically entered a sewer. The baseline is the team's earlier
+query, not a survey or benchmark of a deployed product.
 
 ### E2 method
 
-Each probe builds a fresh permit that passes every clause, breaks exactly one rule, sends the invalid write a client could send
-(a raw `UPDATE`, an `INSERT`, a `DELETE`), and rolls everything back. The 18 probes are one per rule that the database enforces
-on writes (BR-01 to BR-12, BR-22, BR-23, BR-31, BR-34, BR-36, BR-41). The other rules are not refusals and are evidenced
-elsewhere: detection rules BR-30, BR-32, BR-33, BR-35 by E1 and `tests/db/test_detection.py`; the atomic consequences BR-20 and
-BR-21 by the forced-failure test in `tests/db/test_consequences.py`; audited rule parameters BR-40 by
-`test_daylight_hours_are_law_as_data_and_the_change_is_audited` (`tests/db/test_entry_rules.py`); row-level security BR-42 by
-`tests/db/test_rls.py`. Probes run as the table owner, which bypasses row-level security but not triggers,
-so they measure the rules, not the roles.
+Each probe builds a valid starting fixture, breaks one database-enforced invariant, attempts the corresponding invalid write,
+and rolls back. The generated report names the probes and outcomes. These are tests of stored authorization and record
+integrity; a refused authorization write does not prove physical access was blocked. It also does not justify refusing a real
+exit, evacuation or rescue record: the safety lifecycle separately preserves truthful exits and records overruns. Probes run
+as the table owner, which bypasses row-level security but still exercises database triggers; role-specific access is tested
+separately in `tests/db/test_rls.py` and `tests/db/test_privileges.py`.
 
 ### E3 method
 
-`eval_add_history(n)` ([`evaluation.sql`](../database/evaluation/evaluation.sql)) appends resolved complaints: 5 % cleared by a
-lawful manual entry through the real gate (waiver, permit, crew of four, statutory gear, three gas readings,
-`authorise_entry()`, two logged entries, closed), 3 % exempt, the rest cleared by a machine except about 2 % left without
-evidence. So permits, crew, gear, readings and entries grow with the history, not only complaints. After each step: `ANALYZE`,
-one warm-up, then 30 repetitions of the entry decision and 5 of the scan, each rolled back so every repetition does the same
-work. "Before 0011" and "without indexes" re-create the old views or drop the indexes inside a transaction that is rolled back
-(PostgreSQL DDL is transactional), on the same data.
+`eval_add_history(n)` ([`evaluation.sql`](../database/evaluation/evaluation.sql)) creates synthetic history through the real
+constraints and triggers, including permits, crew, gear, readings and entries. The fixture's receipt and event times are
+generated under the current temporal rules; the result file records row counts. After each growth step, the script analyzes
+the data, warms the operation and takes repeated measurements, rolling back timed writes so each repetition starts from the
+same state. Index and pre-optimization comparisons use the same workload; the pre-M6 view must preserve the final temporal
+view's semantics and differ only by the materialization change.
 
 ## Results
 
-Run of 2026-10-07 on one Windows laptop (22 logical CPUs), embedded PostgreSQL 16.2 with default settings. Counts below are
-exact; times are rounded from [EVALUATION_RESULTS.md](EVALUATION_RESULTS.md) (which has the exact figures and the per-class and
-per-rule tables), because they move a little from run to run and machine to machine.
+Use the per-class, per-rule, size and plan tables in [EVALUATION_RESULTS.md](EVALUATION_RESULTS.md) together with their run
+metadata. The generated M6 results now include migrations 0012–0014 and the measured late-evidence invoice holds.
+Use measurements only when the recorded commit and schema match the release being described. Results are workload-specific: the more complete
+temporal and applicability checks may cost more than a simpler anti-join. The M6 optimization materializes the one-row
+parameter CTE in the final SE1/SE2 views; the comparison should hold temporal view semantics fixed and quantify only that
+query-plan change.
 
-| | ZeroEntry | Conventional baseline | Improvement |
-|---|---|---|---|
-| **E1** detection, 200 labelled complaints | precision 100 %, recall 100 %, F1 1.00 | naive anti-join: precision 40 %, recall 50 %, F1 0.44 | 60 false alarms and 40 missed shadow entries removed |
-| **E1** late paperwork, 20 invoiced cases | 20 kept for human review, all 20 invoices still held | 20 silently dropped from the list | no suspicion disappears without a decision |
-| **E2** invalid writes refused | 18 of 18 | 1 of 18 (only the `UNIQUE` constraint both designs share) | 17 rule violations that any non-UI client could commit are refused |
-| **E3a** entry decision, 1k to 100k complaints | about 2 ms median and about 50 buffers at every size | without its indexes: several times slower at 100k, and growing | the cost of a decision does not grow with history |
-| **E3b** detection candidate query, 100k complaints | about 0.3 s, about 57,000 buffers | without its indexes: tens of seconds, about 7.8 million buffers | about 100x faster, over 100x less data processed |
-| **E3b** detection before and after migration `0011`, 100k complaints | candidate query about 0.3 s; full scan under a second | the same views before `0011`: about 4x longer and 2.7x more buffers; full scan several seconds | found by this evaluation; scan 4x to 6x faster across sizes |
-| **E4** concurrent races that commit a broken proof | 0 of 4 | before migration `0010`: 4 of 4 | the gate is race-free |
-
-Reading the numbers:
-
-* **Where the naive query goes wrong (E1).** It flags complaints whose first machine failed and a second one cleared, exempt
-  resolutions, and complaints still inside the grace window. It misses complaints resolved with no job at all and closed
-  permits whose entrant never logged an entry. At 100,000 complaints it is cheaper but flags 4,751 complaints where
-  1,900 are real candidates: the extra 2,851 are exactly the exempt resolutions in the history.
-* **What the baseline still refuses (E2).** Only the duplicate alert, because `UNIQUE` is part of the shared schema. Every other
-  rule is a trigger or a function in ZeroEntry; without them the same tables accept an authorised permit with no standby, a
-  95-minute entry, a re-opened closed permit, a deleted audit row, and the rest of the list.
-* **Scalability (E3).** The decision touches about 50 buffers whatever the size of the history, because every clause is an
-  index lookup on one permit. The scan grows linearly with history (about ten times the time for ten times the complaints)
-  because it re-evaluates every resolved complaint; without its indexes it grows much faster than linearly.
-* **The evaluation found a real defect (0011).** The first run showed the detection views calling `rule_num()` once per joined
-  row: PostgreSQL 12+ inlines a CTE that is referenced once. Materialising it makes the candidate query about 4x faster with
-  about 2.7x fewer buffers (the same ratio in every run so far), with identical results (`rule_num()` is `STABLE`). The full
-  scan gained 4x to 6x across sizes in the published run (one earlier run measured more; the exact factor depends on the
-  plan PL/pgSQL settles on). A test now checks the plan
-  keeps the CTE ([ADR-013](decisions/README.md#adr-013--measure-against-a-stated-baseline-read-rule-parameters-once-per-statement-migration-0011)).
-* **E4** is not re-run by the script: `tests/db/test_concurrency.py` reproduces the four races, and the 2026-10-07 build
-  session recorded each of them committing before `0010` and being refused after ([DEV_LOG](development/DEV_LOG.md)).
+The supplementary [temporal benchmark](evaluation/RESULTS.md) has a separate workload and baseline: its baseline deliberately
+lacks the time and applicability semantics evaluated by SE1. Treat it as an evidence-gap/temporal experiment, not an equal-task
+speed comparison or a substitute for E1-E4. Its run metadata identifies the measured commit, machine and data.
 
 ## What the evaluation does not prove
 
-* **Synthetic data.** E1 measures fidelity to the stated rules on labelled cases built to exercise them, not accuracy on real
-  municipal records. Real-world precision depends on how faithfully a ULB records resolutions; a pilot on one zone's complaint
-  history is the next step (see TRL in [SUBMISSION.md](SUBMISSION.md#6-technology-readiness-level-and-demonstration)).
-* **The baselines are ours.** The naive anti-join is the team's earlier design, written down in the proposal before the build,
-  not a product someone else ships. The enforcement baseline models "rules in application code"; a real application would also
-  check, but every other client would not, which is what E2 measures.
+* **Synthetic data.** E1 measures fidelity to configured evidence-gap labels, not physical-entry truth or accuracy on real ULB
+  records. Real-world performance depends on source-system coverage and the correctness of records; a read-only pilot is next.
+* **The baselines are bounded.** The naive anti-join is the team's earlier proposal, not an industry-wide query benchmark. The
+  E2 baseline models rules enforced only in one application while other database clients can write directly; it is not a
+  comparison against every production system.
 * **One machine, default settings.** Timings come from one development laptop running the embedded PostgreSQL 16 with default
-  settings, warm cache, one session. Buffers and counts transfer to other machines better than milliseconds do.
-* **The scan is a full pass.** It re-evaluates every resolved complaint each time (idempotent, simple, under a second at 100,000
-  complaints). If volumes ever make that too slow, the upgrade path is an incremental scan fed by a change queue.
-* **Outcomes.** Nothing here measures deaths prevented; that needs a deployment.
+  settings and a warm local cache. Buffer counts and wall times depend on dataset, schema and hardware and are not production
+  capacity guarantees.
+* **The scan is a full pass.** It re-evaluates eligible resolved complaints; it is not an incremental event-driven cache.
+* **Outcomes.** Nothing here measures actual entries, worker behavior, deaths prevented or compensation paid; those require a
+  deployment and independent field evaluation.

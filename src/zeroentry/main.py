@@ -1,6 +1,7 @@
 """Application factory. Run with: uvicorn --factory zeroentry.main:create_app"""
 
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from .config import Settings, get_settings
 from .db import database_status, make_engine, make_sessionmaker
 from .errors import install_error_handlers
 from .log import configure_logging, mask_url
+from .maintenance import maintain
 from .routers import admin, auth, complaints, detection, money, permits, reference, reports
 from .security import SlidingWindowLimiter
 
@@ -39,8 +41,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         log.info("starting ZeroEntry %s (%s) -> %s", __version__, settings.app_env, mask_url(settings.database_url))
-        yield
-        engine.dispose()
+        stop = asyncio.Event()
+        task = None
+        if settings.safety_sweep_interval_seconds:
+            task = asyncio.create_task(maintain(engine, settings.safety_sweep_interval_seconds,
+                                               stop, app.state.maintenance))
+        try:
+            yield
+        finally:
+            stop.set()
+            if task:
+                await task
+            engine.dispose()
 
     app = FastAPI(title="ZeroEntry", version=__version__, lifespan=lifespan,
                   docs_url=None if settings.app_env == "production" else "/docs",
@@ -48,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
+    app.state.maintenance = {"interval_seconds": settings.safety_sweep_interval_seconds}
     app.state.login_limiter = SlidingWindowLimiter(settings.login_ip_limit, 60)   # per process; see security.py
     install_error_handlers(app)
 

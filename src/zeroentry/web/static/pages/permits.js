@@ -2,7 +2,7 @@ import { api, badge, fmtDT, form, guard, h, isRole, options, pager, qs, table, t
 
 export default async function (root) {
   root.append(h('h1', {}, 'Entry permits'),
-    h('p', { class: 'muted' }, 'A permit becomes AUTHORISED only when the database can prove every statutory safeguard. Open a draft to see exactly which clauses pass or fail.'));
+    h('p', { class: 'muted' }, 'A permit becomes AUTHORISED only when its recorded evidence passes every configured check. Open a draft to see exactly which clauses pass or fail.'));
 
   const filters = { status: '', q: '', offset: 0 };
   const results = h('div');

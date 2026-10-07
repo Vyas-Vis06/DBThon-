@@ -14,6 +14,7 @@ credentials, personal data or production URLs in an issue.
 | Asset | Threat | Main controls |
 |---|---|---|
 | The entry decision | A client (UI, script, `psql`) marks a permit `AUTHORISED` without the proof | the gate trigger refuses every path, including a raw `UPDATE`/`INSERT` and concurrent sessions ([DATABASE_DESIGN §5, §8](docs/DATABASE_DESIGN.md)) |
+| Continuing admission | New unsafe readings, expired credentials, stale checks after waiting for locks | revalidation on evidence changes and each admission, fresh server clocks after locking, periodic safety sweep |
 | Evidence (readings, entries, alerts, audit) | Rewriting or deleting the record after the fact | append-only triggers, revoked privileges, audit trigger as owner |
 | Contractor and worker data | One tenant reading or changing another's rows | role guards in the API **and** row-level security in PostgreSQL |
 | Accounts | Password guessing, session theft, CSRF | bcrypt, lockout, throttle, opaque sessions, HttpOnly SameSite=Strict cookie, CSRF token plus origin check |
@@ -40,6 +41,14 @@ credentials, personal data or production URLs in an issue.
 | Browser: strict CSP (`default-src 'self'`, no inline script or style, no third-party origin), `X-Frame-Options: DENY`, `nosniff`, `no-store`; the UI builds the DOM from text nodes only | `main.py`, `web/` | `tests/api/test_web.py` |
 | Production hardening: refuses to start with `COOKIE_SECURE=false` or a `CHANGE_ME` URL; `/docs` and `/openapi.json` are off | `config.py`, `main.py` | `test_security_headers_are_set_and_docs_are_hidden_in_production`, unit tests |
 | Secrets: nothing secret in the repository; `.env` is ignored; dev passwords are generated per machine into `.pgdata/` | `.gitignore`, `scripts/dev.py` | review; `.env.example` holds placeholders only |
+| Crew and gear cannot be moved from a frozen permit to a draft; private lock helpers cannot be called directly by runtime users | migration `0012` | `tests/db/test_safety_lifecycle.py` |
+| Open entries remain closable after stop; future exit assertions and excessive durations create refusals or immutable violation evidence | migration `0012`, `routers/permits.py` | `tests/db/test_safety_lifecycle.py`, `tests/db/test_integration_adversarial.py`, `tests/api/test_workflow.py` |
+| Evidence receipt times are assigned by the server; a late finalization cannot masquerade as timely clearance | migrations `0012`, `0013` | `tests/db/test_temporal_evidence_and_invoice_races.py`, `tests/api/test_temporal_evidence.py` |
+| Payment/approval, source holds and new invoices share serialization locks; unsupported stale snapshot isolation is refused | migration `0013` | `tests/db/test_temporal_evidence_and_invoice_races.py`, `tests/db/test_integration_adversarial.py` |
+| Runtime policy writes update only the value; revision, actor and receipt time are trigger-owned; reason required | migration `0014`, `routers/admin.py` | `tests/db/test_policy_provenance.py`, `tests/db/test_integration_adversarial.py` |
+| Authorization saves immutable evidence, source classifications and policy revisions with a SHA-256 digest; tenant scope applies to decision and safety history | migration `0014`, permit endpoints | `tests/db/test_policy_provenance.py`, `tests/api/test_decision_history_api.py` |
+| Runtime authorization requires READ COMMITTED; stale snapshots of draft-worker credentials are refused through both function and raw UPDATE | migration `0014` | `tests/db/test_integration_adversarial.py` |
+| A failed detection scan cannot roll back a committed safety stop; automatic work uses bounded waits and transaction advisory locks | `maintenance.py` | `tests/db/test_maintenance.py` |
 
 ## Known limitations (not hidden, not fixed)
 
@@ -52,4 +61,11 @@ credentials, personal data or production URLs in an issue.
 * **Engineers and supervisors see every ULB.** ULB-scoped visibility is in the ROADMAP backlog.
 * **The database enforces state, not physics.** A typed gas value may be false; it is bound to a detector serial, a calibration
   date and a signed-in recorder, and kept append-only (PROJECT_SPEC §7).
+* **Append-only is an application trust boundary.** A database owner or superuser can disable triggers or alter the schema.
+  Snapshot hashes are local integrity checks, without an external signature or anchor. They do not establish sensor truth.
+* **Time-based stops are periodic.** Automatic sweeps default to 30 seconds while the application runs; admission always
+  rechecks current conditions. Physical evacuation and external notifications still require people and equipment.
+  The SQL maintenance function is available for an external scheduler when automatic ticks are disabled.
+* **Historical import is privileged.** Demo seeds and synthetic evaluation fixtures use narrowly scoped owner-only receipt
+  backfills. Runtime callers cannot set these receipts; the imported examples are not genuine field evidence.
 * **Demo credentials** printed by `scripts/dev.py` are for a local machine only; never expose the development server.

@@ -105,7 +105,7 @@ def test_a_contractor_can_change_nothing_except_invoice_its_own_jobs(world, conn
     with expect("42501"):
         app.execute("INSERT INTO incident (incident_type, occurred_at, manhole_id, worker_id, contractor_id, description, recorded_by) "
                     "VALUES ('NEAR_MISS', now(), %s, %s, %s, 'x', %s)", (a["manhole"], a["e1"], a["contractor"], a["supervisor"]))
-    with expect("42501"):                                                                # B's job
+    with expect("ZE006"):                                                                # B's job; serialized invoice guard denies scope
         app.execute("INSERT INTO invoice (job_id, invoice_no, amount_inr) VALUES (%s, 'STEAL-1', 1)", (b["job"],))
     app.execute("INSERT INTO invoice (job_id, invoice_no, amount_inr) VALUES (%s, 'MINE-1', 500)", (a["job"],))   # own job: allowed
     assert owner_count(conn, "invoice") == 3
@@ -234,7 +234,8 @@ def test_the_detection_workflow_runs_under_an_engineer_context(world, conn, app)
 def test_only_an_admin_can_change_the_law_and_the_catalogues(world, conn, app):
     a = world["a"]
     act_as(app, world["admin"], "ADMIN")
-    assert app.execute("UPDATE rule_parameter SET value = 4, updated_by = %s WHERE param_key = 'min_crew_size'", (world["admin"],)).rowcount == 1
+    app.execute("SELECT set_config('app.rule_change_reason', 'Synthetic RLS policy verification', false)")
+    assert app.execute("UPDATE rule_parameter SET value = 4 WHERE param_key = 'min_crew_size'").rowcount == 1
     assert app.execute("UPDATE gear_item SET statutory = false WHERE gear_code = 'GUMBOOTS'").rowcount == 1
     act_as(app, a["engineer"], "ENGINEER")
     assert app.execute("UPDATE gear_item SET statutory = false WHERE gear_code = 'SAFETY_HARNESS'").rowcount == 0

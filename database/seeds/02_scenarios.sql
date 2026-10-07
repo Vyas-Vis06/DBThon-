@@ -18,6 +18,10 @@ CREATE FUNCTION pg_temp.wid(p_nam text) RETURNS bigint LANGUAGE sql AS $$ SELECT
 CREATE FUNCTION pg_temp.uid(p_login text) RETURNS bigint LANGUAGE sql
 AS $$ SELECT user_id FROM app_user WHERE email = p_login || '@zeroentry.example' $$;
 
+-- These are synthetic historical timeline fixtures. Disable only the live outcome-time guard for this owner-only seed
+-- transaction, then load explicit receipt times below. Application inserts/finalizations always use the DB clock.
+ALTER TABLE machine_deployment DISABLE TRIGGER trg_machine_deployment_outcome_guard;
+
 CREATE FUNCTION pg_temp.complaint(p_manhole text, p_desc text, p_raised interval, p_resolved interval, p_code text) RETURNS bigint
 LANGUAGE sql AS $$
   INSERT INTO complaint (manhole_id, description, raised_at, status, resolved_at, resolution_code, resolved_by)
@@ -31,13 +35,13 @@ $$;
 CREATE FUNCTION pg_temp.job(p_complaint bigint, p_lic text) RETURNS bigint LANGUAGE sql
 AS $$ INSERT INTO job (complaint_id, contractor_id, created_by) VALUES (p_complaint, pg_temp.cid(p_lic), pg_temp.uid('engineer')) RETURNING job_id $$;
 
--- A machine deployment whose server-side "recorded_at" is set explicitly, because whether evidence was recorded in time is
--- exactly what the detector measures.
+-- A machine deployment whose receipt times are set explicitly because the detector's example timelines are historical.
 CREATE FUNCTION pg_temp.deploy(p_job bigint, p_machine text, p_started interval, p_ended interval, p_outcome text, p_recorded interval) RETURNS void
 LANGUAGE sql AS $$
-  INSERT INTO machine_deployment (job_id, machine_id, started_at, ended_at, outcome, recorded_by, recorded_at)
+  INSERT INTO machine_deployment (job_id, machine_id, started_at, ended_at, outcome, recorded_by, recorded_at, outcome_recorded_at)
   SELECT p_job, m.machine_id, now() - p_started, CASE WHEN p_outcome IS NULL THEN NULL ELSE now() - p_ended END, p_outcome,
-         pg_temp.uid('engineer'), now() - p_recorded
+         pg_temp.uid('engineer'), now() - p_recorded,
+         CASE WHEN p_outcome IS NULL THEN NULL ELSE now() - p_recorded END
     FROM machine m WHERE m.code = p_machine
 $$;
 
@@ -156,3 +160,20 @@ BEGIN
   CALL record_incident('NEAR_MISS', now() - interval '10 days', pg_temp.wid('NAM-TN-100010'), pg_temp.mh('CHN-TEY-004'),
                        'Synthetic history: a worker slipped on the ladder and was caught by the harness.', v_sup, NULL, NULL, v_inc);
 END $seed$;
+
+-- S8 is a synthetic historical example. Its rows passed through the live entry guard above, which stamps server-clock
+-- receipts. Backfill only this seeded permit's receipt times to match the example timeline, using the same owner-only
+-- history-import pattern as machine deployments. Runtime writes never accept these client-supplied times.
+ALTER TABLE entry_log DISABLE TRIGGER trg_entry_log_guard;
+UPDATE entry_log e
+   SET recorded_at = upper(e.period) + interval '5 minutes',
+       exit_recorded_at = upper(e.period) + interval '5 minutes'
+  FROM entry_permit p
+  JOIN job j ON j.job_id = p.job_id
+  JOIN complaint c ON c.complaint_id = j.complaint_id
+ WHERE e.permit_id = p.permit_id
+   AND c.description = '[seed] Chamber blocked by tree roots; machines could not reach it'
+   AND upper(e.period) IS NOT NULL;
+ALTER TABLE entry_log ENABLE TRIGGER trg_entry_log_guard;
+
+ALTER TABLE machine_deployment ENABLE TRIGGER trg_machine_deployment_outcome_guard;

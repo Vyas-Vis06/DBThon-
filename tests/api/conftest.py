@@ -17,7 +17,8 @@ STAFF = {"admin", "engineer", "supervisor", "auditor"}
 
 
 def make_settings(db, **overrides) -> Settings:
-    base = dict(app_env="test", database_url=db.app_url, bcrypt_rounds=4, login_max_failures=3, login_ip_limit=10_000)
+    base = dict(app_env="test", database_url=db.app_url, bcrypt_rounds=4, login_max_failures=3, login_ip_limit=10_000,
+                safety_sweep_interval_seconds=0)
     return Settings(**{**base, **overrides})
 
 

@@ -1,9 +1,11 @@
 """The runtime role (ze_app) can do its job and nothing more. Even a compromised application cannot rewrite history."""
 
+from datetime import datetime
+
 import psycopg
 import pytest
 
-from tests.factories import Factory, utc, yesterday_ist
+from tests.factories import Factory, IST, utc, yesterday_ist
 from tests.helpers import act_as
 
 DENIED = psycopg.errors.InsufficientPrivilege
@@ -67,8 +69,8 @@ def test_the_runtime_role_can_still_do_the_narrow_things_the_workflow_needs(app,
     s = seeded
     admin = Factory(conn).user("ADMIN")
     act_as(app, admin, "ADMIN")                                    # row-level security: no identity, no rows
-    app.execute("UPDATE rule_parameter SET value = 12, updated_by = %s, updated_at = now() WHERE param_key = 'gas_h2s_max_ppm'",
-                (admin,))
+    app.execute("SELECT set_config('app.rule_change_reason', 'Synthetic privilege verification', false)")
+    app.execute("UPDATE rule_parameter SET value = 12 WHERE param_key = 'gas_h2s_max_ppm'")
     app.execute("UPDATE detection_rule SET enabled = false WHERE rule_code = 'SE2_ENTRANT_NOT_LOGGED'")
     app.execute("SELECT * FROM scan_shadow_entries(now())")                                    # needs INSERT + limited UPDATE on alerts
     assert app.execute("SELECT count(*) AS n FROM audit_log").fetchone()["n"] > 0           # may read the trail
@@ -79,7 +81,7 @@ def test_gate_and_incident_machinery_work_under_the_runtime_role(app, conn):
     """authorise_entry runs with ze_app's own privileges; record_incident runs as the owner (0009) and checks the
     recorder's role itself. Both must work end to end when called by the runtime role."""
     f = Factory(conn)
-    s = f.gate_scenario(yesterday_ist())
+    s = f.gate_scenario(datetime.now(IST))
     act_as(app, s["supervisor"], "SUPERVISOR")
     rows = app.execute("SELECT * FROM authorise_entry(%s, %s, %s)", (s["permit"], s["supervisor"], s["at"])).fetchall()
     assert all(r["passed"] for r in rows) and rows[0]["permit_status"] == "AUTHORISED"

@@ -5,6 +5,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from ..deps import DB, STAFF, Paging, Principal, paged, require, to_dict
 from ..errors import Forbidden, NotFound
 from ..models import (AppUser, Complaint, Contractor, EntryLog, EntryPermit, GasDetector, GasReading, GearIssue, GearItem,
                       Job, Manhole, MechanisationWaiver, PermitCrew, Ulb, Worker)
+from ..models import PermitSafetyEvent
 from ..schemas import CrewIn, EntryIn, ExitIn, GearIssueIn, PermitIn, ReadingIn, ReasonIn
 
 router = APIRouter(prefix="/permits", tags=["permits"])
@@ -61,7 +63,8 @@ def _entry(e: EntryLog, name: str | None = None, namaste: str | None = None) -> 
     start, end = e.period.lower, e.period.upper
     return {"entry_id": e.entry_id, "permit_id": e.permit_id, "worker_id": e.worker_id, "worker_name": name, "namaste_id": namaste,
             "entered_at": start, "exited_at": end, "open": end is None,
-            "minutes": None if end is None else round((end - start).total_seconds() / 60)}
+            "minutes": None if end is None else round((end - start).total_seconds() / 60),
+            "entry_recorded_at": e.recorded_at, "exit_recorded_at": e.exit_recorded_at}
 
 
 # --- list and dossier --------------------------------------------------------------------------------------------
@@ -211,10 +214,23 @@ def authorise(permit_id: int, db: DB, principal: Principal = Depends(require(*DE
 @router.post("/{permit_id}/entries", status_code=201)
 def log_entry(permit_id: int, body: EntryIn, db: DB, principal: Principal = Depends(require(*OPERATE))):
     _operable(db, permit_id, principal)
-    row = EntryLog(permit_id=permit_id, worker_id=body.worker_id, period=Range(body.entered_at, body.exited_at, bounds="[)"),
-                   recorded_by=principal.user_id)
-    db.add(row)
-    db.flush()                                   # 90 min, daylight, window, ENTRANT role, overlap: all enforced by the database
+    # Always pass through the database's open-entry admission gate first. Suppressed rows represent
+    # a durable automatic safety stop, so return normally (rather than raising and rolling it back).
+    entry_id = db.execute(text(
+        "INSERT INTO entry_log (permit_id, worker_id, period, recorded_by) "
+        "VALUES (:pid, :wid, tstzrange(:entered, NULL, '[)'), :actor) RETURNING entry_id"),
+        {"pid": permit_id, "wid": body.worker_id, "entered": body.entered_at, "actor": principal.user_id}).scalar_one_or_none()
+    if entry_id is None:
+        state = db.execute(text("SELECT status, end_reason FROM entry_permit WHERE permit_id = :pid"),
+                           {"pid": permit_id}).mappings().one()
+        return JSONResponse(status_code=409, content={"error": {"code": "safety_stopped",
+            "message": state["end_reason"] or "The permit was stopped because current safety conditions no longer pass.",
+            "details": {"permit_status": state["status"]}}})
+    row = db.get(EntryLog, entry_id)
+    assert row is not None
+    if body.exited_at is not None:
+        row.period = Range(body.entered_at, body.exited_at, bounds="[)")
+        db.flush()                               # exit is retained with server receipt and violation evidence
     return _entry(row)
 
 
@@ -226,6 +242,7 @@ def log_exit(permit_id: int, entry_id: int, body: ExitIn, db: DB, principal: Pri
         raise NotFound("No such entry on this permit.")
     row.period = Range(row.period.lower, body.exited_at, bounds="[)")
     db.flush()
+    db.refresh(row)
     return _entry(row)
 
 
@@ -261,3 +278,23 @@ def stop_work(permit_id: int, body: ReasonIn, db: DB, principal: Principal = Dep
     _load(db, permit_id, principal)
     row = db.execute(text("SELECT * FROM stop_work(:pid, :reason)"), {"pid": permit_id, "reason": body.reason}).mappings().one()
     return {k: row[k] for k in ("permit_id", "status", "end_reason", "ended_at")}
+
+
+@router.get("/{permit_id}/decision")
+def authorization_decision(permit_id: int, db: DB, principal: Principal = Depends(require(*VIEW))):
+    """Original successful gate explanation. Hash the exact canonical_snapshot UTF-8 bytes to verify its digest."""
+    _load(db, permit_id, principal)
+    row = db.execute(text("SELECT d.*, snapshot::text AS canonical_snapshot, "
+                          "snapshot_sha256 = encode(sha256(convert_to(snapshot::text, 'UTF8')), 'hex') AS digest_verified "
+                          "FROM permit_authorization_decision d WHERE permit_id=:pid"), {"pid": permit_id}).mappings().first()
+    if row is None:
+        raise NotFound("No saved authorization decision for this permit (draft or pre-migration history).")
+    return dict(row)
+
+
+@router.get("/{permit_id}/safety-events")
+def safety_events(permit_id: int, db: DB, page: Paging, principal: Principal = Depends(require(*VIEW))):
+    """Scoped immutable stop and violation history; records survive a permit ending."""
+    _load(db, permit_id, principal)
+    return paged(db, select(PermitSafetyEvent).where(PermitSafetyEvent.permit_id == permit_id)
+                 .order_by(PermitSafetyEvent.event_id.desc()), page)

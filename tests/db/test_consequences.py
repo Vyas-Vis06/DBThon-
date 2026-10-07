@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
-from tests.factories import Factory, yesterday_ist
+from tests.factories import Factory, IST, yesterday_ist
 from tests.helpers import expect
 
 
@@ -17,8 +17,8 @@ def f(conn):
 
 @pytest.fixture
 def world(conn, f):
-    """An authorised permit with e1 inside, plus invoices in each state and an unrelated job with an invoice."""
-    s = f.gate_scenario(yesterday_ist(10, 0))
+    """A currently valid authorised permit, plus invoices in each state and an unrelated job with an invoice."""
+    s = f.gate_scenario(datetime.now(IST))
     rows = conn.execute("SELECT * FROM authorise_entry(%s, %s, %s)", (s["permit"], s["supervisor"], s["at"])).fetchall()
     assert all(r["passed"] for r in rows)
     s["inv_submitted"] = f.invoice(s["job"])

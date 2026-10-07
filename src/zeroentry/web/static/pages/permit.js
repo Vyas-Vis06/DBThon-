@@ -1,4 +1,4 @@
-import { ago, api, badge, clauseList, fmtDT, form, h, isRole, kv, localIST, options, table, tabs, toast } from '/static/app.js';
+import { ago, api, badge, clauseList, fmtDT, form, h, isRole, kv, localIST, options, pager, table, tabs, toast } from '/static/app.js';
 
 const BANNER = {
   AUTHORISED: ['ok', 'ENTRY AUTHORISED'], CLOSED: ['warn', 'PERMIT CLOSED'], ABORTED: ['bad', 'PERMIT ABORTED (stop-work)'], CANCELLED: ['warn', 'PERMIT CANCELLED'],
@@ -13,6 +13,7 @@ export default async function (root, { params }) {
   const staff = isRole('ADMIN', 'ENGINEER', 'SUPERVISOR', 'AUDITOR');
   const draft = p.status === 'DRAFT';
   const authorised = p.status === 'AUTHORISED';
+  const canRecordExit = authorised || p.status === 'ABORTED';
   const reload = () => location.reload();
 
   root.append(
@@ -31,7 +32,7 @@ export default async function (root, { params }) {
     const failing = clauses.filter((c) => !c.passed);
     decision.replaceChildren(
       verdict || h('p', { class: 'banner ' + (failing.length ? 'bad' : 'ok') },
-        failing.length ? `NOT READY: ${failing.length} of ${clauses.length} legal clause(s) fail right now.` : `READY: all ${clauses.length} legal clauses pass right now.`),
+        failing.length ? `NOT READY: ${failing.length} of ${clauses.length} checks fail right now.` : `READY: all ${clauses.length} configured checks pass right now.`),
       clauseList(clauses), decisionButtons());
   };
 
@@ -40,7 +41,7 @@ export default async function (root, { params }) {
     return h('div', { class: 'row' },
       h('button', { type: 'button', onclick: recheck }, 'Re-check the clauses'),
       h('button', { type: 'button', class: 'primary', onclick: authorise }, 'Ask the database to authorise entry'),
-      h('span', { class: 'small muted' }, 'Gas readings go stale after 15 minutes; re-check before asking.'));
+      h('span', { class: 'small muted' }, 'Gas readings have a configured freshness limit; re-check before asking.'));
   }
 
   async function recheck() {
@@ -52,10 +53,10 @@ export default async function (root, { params }) {
     try {
       const r = await api('POST', `/permits/${id}/authorise`);
       if (r.authorised) {
-        showChecklist(r.clauses, h('p', { class: 'banner ok' }, 'AUTHORISED: the database proved every clause. Crew and gear are now frozen.'));
+        showChecklist(r.clauses, h('p', { class: 'banner ok' }, 'AUTHORISED: every configured check passed. The original decision is saved; crew and gear are now frozen.'));
         setTimeout(reload, 1500);
       } else {
-        showChecklist(r.clauses, h('p', { class: 'banner bad' }, `DENIED: ${r.failed.length} legal clause(s) not satisfied: ${r.failed.join(', ')}`));
+        showChecklist(r.clauses, h('p', { class: 'banner bad' }, `DENIED: ${r.failed.length} check(s) not satisfied: ${r.failed.join(', ')}`));
       }
     } catch (e) { toast(e.message, 'bad'); }
   }
@@ -123,7 +124,7 @@ export default async function (root, { params }) {
   };
 
   const gasTab = async (box) => {
-    box.append(h('p', { class: 'muted' }, 'For each depth the LATEST reading governs: at most 15 minutes old, from a detector calibrated that day, O₂ 19.5–21 %, H₂S and combustibles below their limits. Readings cannot be edited or deleted.'),
+    box.append(h('p', { class: 'muted' }, 'For each depth the LATEST reading governs. It must be fresh, within the configured gas limits and from a detector calibrated that day. Readings cannot be edited or deleted.'),
       table([['Taken (IST)', (r) => [fmtDT(r.taken_at), ' ', h('span', { class: 'small muted' }, ago(r.taken_at))]], ['Depth', (r) => badge(r.depth_level, 'info')],
         ['O₂ %', (r) => r.o2_pct], ['H₂S ppm', (r) => r.h2s_ppm], ['LEL %', (r) => r.lel_pct], ['CO ppm', (r) => r.co_ppm], ['Detector', (r) => r.detector_serial],
         ['Signed off by', (r) => r.recorded_by_name]], d.readings, 'No readings logged yet.'));
@@ -144,10 +145,10 @@ export default async function (root, { params }) {
   };
 
   const entriesTab = async (box) => {
-    box.append(h('p', { class: 'muted' }, 'Entries are accepted only on an AUTHORISED permit, by an ENTRANT, inside the validity window, in daylight, for at most 90 minutes, and never overlapping for the same worker. A refusal shows the exact rule.'),
+    box.append(h('p', { class: 'muted' }, 'A new entry needs current authorisation, an ENTRANT, a valid permit, and daylight. No worker can have overlapping entries. A 90-minute stretch requires a 30-minute rest; if an exit is reported late, it is still recorded with violation evidence. Open entries remain closable after a permit stop.'),
       table([['Worker', (e) => `${e.worker_name} (${e.namaste_id})`], ['Entered', (e) => fmtDT(e.entered_at)], ['Exited', (e) => e.open ? badge('INSIDE NOW', 'warn') : fmtDT(e.exited_at)],
         ['Minutes', (e) => e.minutes ?? ''],
-        ['', (e) => (e.open && supervisor && authorised) ? h('details', {}, h('summary', {}, 'Record exit'), form([
+        ['', (e) => (e.open && supervisor && canRecordExit) ? h('details', {}, h('summary', {}, p.status === 'ABORTED' ? 'Record exit after stop' : 'Record exit'), form([
           { name: 'exited_at', label: 'Exited', type: 'datetime', value: 'now', required: true }],
           async (v) => { await api('POST', `/permits/${id}/entries/${e.entry_id}/exit`, v); reload(); }, { submit: 'Record exit' })) : '']], d.entries, 'No one has entered.'));
     if (authorised && supervisor) {
@@ -177,10 +178,67 @@ export default async function (root, { params }) {
     }
   };
 
+  const originalTab = async (box) => {
+    let saved;
+    try { saved = await api('GET', `/permits/${id}/decision`); }
+    catch (e) {
+      if (e.status === 404) { box.append(h('p', { class: 'muted' }, 'An original decision is saved when a new permit is authorised. Older permits may have no saved decision.')); return; }
+      throw e;
+    }
+    const snapshot = saved.snapshot;
+    box.append(h('p', { class: 'banner ' + (saved.digest_verified ? 'ok' : 'bad') },
+      saved.digest_verified ? 'Saved decision digest verified' : 'Saved decision digest does not match'),
+    h('p', {}, `Checks and evidence as recorded at ${fmtDT(saved.decision_at)}. Later policy changes do not rewrite this record.`),
+    clauseList(snapshot.gate.map((c) => ({ ...c, legal_ref: c.sources.map((s) => `${s.source_type}: ${s.title} · ${s.citation_clause}`).join('; ') }))),
+    h('h3', {}, 'Policy values used'), table([
+      ['Parameter', (r) => h('code', {}, r.param_key)], ['Revision', (r) => r.revision], ['Value', (r) => `${r.value} ${r.unit}`],
+      ['Basis', (r) => badge(r.source.source_type, r.source.source_type === 'PRODUCT_POLICY' ? 'warn' : 'info')],
+      ['Reference', (r) => r.source.source_url ? h('a', { href: r.source.source_url, target: '_blank', rel: 'noopener noreferrer' }, r.source.title) : r.source.title],
+    ], snapshot.policy_parameters),
+    h('details', {}, h('summary', {}, 'Saved evidence and digest'),
+      h('p', { class: 'small muted' }, 'The digest checks the saved content within this database. It is not an external signature or proof that a reported reading was physically true.'),
+      h('pre', { class: 'sql' }, saved.snapshot_sha256), h('pre', { class: 'sql' }, JSON.stringify(snapshot.evidence, null, 2))));
+  };
+
+  const safetyTab = async (box) => {
+    const results = h('div');
+    const load = async (offset = 0) => {
+      const events = await api('GET', `/permits/${id}/safety-events?limit=25&offset=${offset}`);
+      results.replaceChildren(table([
+        ['When (IST)', (e) => fmtDT(e.occurred_at)], ['Event', (e) => badge(e.event_type, 'warn')],
+        ['Reason', (e) => e.reason_code.replaceAll('_', ' ')],
+        ['Details', (e) => h('details', {}, h('summary', {}, e.detail.end_reason || e.detail.detail || 'View recorded evidence'), h('pre', { class: 'sql' }, JSON.stringify(e.detail, null, 2)))],
+      ], events.items, 'No stop or violation events recorded.'), pager(events, (offset) => load(offset).catch((e) => toast(e.message, 'bad'))));
+    };
+    box.append(h('p', { class: 'muted' }, 'Stops and entry violations remain in the record. A permit stop prevents new admission; an open entry can still record the worker’s exit.'), results);
+    if (isRole('ADMIN', 'ENGINEER')) box.append(h('button', { type: 'button', onclick: async () => {
+      try { const result = await api('POST', '/maintenance/sweep'); toast(`${result.stopped} permit(s) stopped after current checks.`); await load(); }
+      catch (e) { toast(e.message, 'bad'); }
+    } }, 'Check active permits now'));
+    await load();
+  };
+
   root.append(h('h2', {}, 'Permit details'), tabs([
     { id: 'crew', label: `Crew (${d.crew.length})`, render: crewTab }, { id: 'gear', label: `Gear (${d.gear.length})`, render: gearTab },
     { id: 'gas', label: `Gas readings (${d.readings.length})`, render: gasTab }, { id: 'entries', label: `Entries (${d.entries.length})`, render: entriesTab },
-    { id: 'end', label: 'End or stop', render: endTab }]));
+    { id: 'original', label: 'Original authorisation', render: originalTab },
+    { id: 'safety', label: 'Safety history', render: safetyTab }, { id: 'end', label: 'End or stop', render: endTab }]));
+
+  if (authorised) {
+    const notice = h('div', { 'aria-live': 'polite' });
+    decision.after(notice);
+    const timer = setInterval(async () => {
+      if (!root.isConnected) { clearInterval(timer); return; }
+      try {
+        const current = (await api('GET', `/permits/${id}`)).permit;
+        if (current.status !== p.status) {
+          clearInterval(timer);
+          notice.replaceChildren(h('p', { class: 'banner bad' }, `Permit is now ${current.status}: ${current.end_reason || 'its status changed'}`),
+            h('button', { type: 'button', onclick: reload }, 'Refresh permit and record exits'));
+        }
+      } catch { /* A temporary connection failure leaves the current form available. */ }
+    }, 10000);
+  }
 }
 
 const fmtDate10 = (s) => new Date(s + 'T00:00:00+05:30').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' });

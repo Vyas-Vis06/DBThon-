@@ -5,7 +5,7 @@ import shutil
 
 import psycopg
 import pytest
-from psycopg.conninfo import make_conninfo
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from tests.conftest import APP_PASSWORD, ROOT
 from zeroentry.config import get_settings
@@ -32,6 +32,8 @@ def fresh(cluster, monkeypatch):
 
 
 def _revision(cluster, name, user="postgres", password=""):
+    if user == "postgres" and not password:
+        password = conninfo_to_dict(cluster.uri).get("password", "")
     with psycopg.connect(make_conninfo(cluster.uri, dbname=name, user=user, password=password)) as c:
         return c.execute("SELECT version_num FROM alembic_version").fetchone()[0]
 

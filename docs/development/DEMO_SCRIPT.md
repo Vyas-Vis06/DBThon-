@@ -1,36 +1,41 @@
 # Demo script (about 3 minutes)
 
-Checked on freshly seeded data on 2026-10-07: the denial, the authorise button and the incidents screen were clicked in the UI;
-crew, gear, readings, entries, the rule change, the dismissal and the scan were sent to the same API endpoints the forms call,
-and every outcome below matched. `06_transactions.sql` was not re-run that day (it is run by the test suite). Start from a clean
-database so the story matches: `python scripts/dev.py --reset`. Keep the printed password at hand.
+Use a fresh, isolated synthetic demo directory without resetting an existing database:
 
-**Before you start:** entries are allowed only in daylight (06:00-18:00 IST, assumption A-03). If you present outside those
-hours, sign in as `admin@`, open **Admin → Rules (law as data)** and set `daylight_start_hour` to 0 and `daylight_end_hour` to 24.
-That edit is itself part of the story ("the law is data, and changing it is audited"). Run the SQL refusal demo
-(step 5) **before** authorising the demo permit: two of its nine refusals need a draft permit.
+```bash
+python scripts/dev.py --data-dir .pgdata/presentation-final --port 8000
+```
+
+Keep the generated password at hand. For a presentation outside 06:00–18:00 IST, an ADMIN can widen the product daylight
+proxy for this synthetic rehearsal only, supplying a reason such as “Synthetic evening presentation, no field operation”.
+Show this change in policy history, and explain that astronomical daylight and real instruments remain outside the demo.
 
 ## 0:00 · The problem (20 s)
 
-> "Indian law already says no one may enter a sewer without gear, gas tests and a standby. People still die, because nothing
-> enforces the rule at the moment of entry, and an entry nobody records leaves no trace. ZeroEntry makes the database refuse
-> the unsafe entry, and finds the unrecorded ones from what is missing."
+> "Indian law and operational guidance require safeguards for sewer entry. ZeroEntry links a recorded permit decision to municipal completion evidence. Its configured safeguards show their legal, guidance or product-policy basis, and missing records become reviewable gaps."
 
 ## 0:20 · Default deny (70 s), as `supervisor@`
 
 1. **Permits** → open the **DRAFT** permit on manhole **CHN-ADY-010**. The checklist shows **5 of 11 clauses failing**: no
    standby; entrant NAM-TN-100002 lacks the breathing apparatus and harness; no TOP, MID or BOTTOM gas reading.
-   > "This is relational division: every entrant must hold every statutory item, and every depth needs a fresh, in-limit
+   > "This is relational division: every entrant must hold every configured required item, and every depth needs a fresh, in-limit
    > reading from a calibrated detector."
 2. Press **Ask the database to authorise entry** → **denied**, with the five reasons. Nothing was authorised.
 3. Fix it through the tabs: **Crew** → add a STANDBY (e.g. NAM-TN-100003); **Gear** → issue the two missing items to
    NAM-TN-100002; **Gas readings** → log TOP, MID and BOTTOM with detector **GD-4G-0001**.
    *Optional:* try detector **GD-4G-0002** first: refused, "calibration expired".
 4. Press **Ask the database to authorise entry** again → **AUTHORISED**, valid for 4 hours.
-5. **Entries** → log an entry of **95 minutes** for an entrant → refused: "exceeds the 90 minute continuous-work limit". Log a
-   lawful open entry, then a second, overlapping one for the same worker → refused by the exclusion constraint. Try to **close**
-   the permit while the worker is inside → refused.
-   > "The API did not decide any of this. A raw SQL `UPDATE ... SET status = 'AUTHORISED'` is refused the same way."
+5. Open **Original authorisation**: show the saved policy revisions, classified sources, evidence IDs and digest.
+   Log an open entry. Attempt an overlapping entry for the same worker, or close the permit while they are inside: refused.
+   Add a BOTTOM reading with O₂ 12%: the database aborts the permit and appends durable safety events. **Record exit** still
+   works after the stop. Alternatively run the authenticated synthetic feed (complete crew/gear first):
+
+   ```bash
+   python scripts/simulate_gas.py --permit 2 --detector 1 --unsafe-after 2
+   ```
+
+   Enter the printed demo password at the hidden prompt. This script posts simulated values as a signed-in supervisor,
+   not as an independently authenticated instrument. The original authorization artifact remains unchanged after stop.
 
 ## 1:30 · Detection by absence (50 s), as `engineer@`
 
@@ -55,9 +60,9 @@ That edit is itself part of the story ("the law is data, and changing it is audi
 
 ## 2:50 · Close (10 s)
 
-10. **Admin → Rules** (as `admin@`): thresholds and amounts are rows with legal references; the change you made is in the
-    **Audit log**.
-    > "The law is data, the gate is the database, and absence is a query."
+10. **Admin → Policy and sources** (as `admin@`): show a parameter revision and its source classification; the change you made
+    is in its revision history and the **Audit log**.
+    > "The database owns the configured gate. Policy history explains the decision, and missing evidence remains reviewable."
 
 ## If asked "how do you know it is better?" (30 s)
 

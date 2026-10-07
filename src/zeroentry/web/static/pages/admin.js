@@ -34,12 +34,31 @@ export default async function (root) {
   };
 
   const rulesTab = async (box) => {
-    const data = await api('GET', '/rules');
-    box.append(h('p', { class: 'muted' }, 'Statutory thresholds and policy numbers are rows, not code. Every change is range-checked and written to the audit log with who, when, old and new. Rows marked ASSUMPTION are engineering placeholders that must be confirmed.'),
+    const [data, sources] = await Promise.all([api('GET', '/rules'), api('GET', '/policy-sources')]);
+    const sourceByCode = new Map(sources.items.map((s) => [s.source_code, s]));
+    const history = h('div');
+    const showHistory = async (key, offset = 0) => {
+      try {
+        const revisions = await api('GET', `/rules/${encodeURIComponent(key)}/history?limit=10&offset=${offset}`);
+        history.replaceChildren(h('h3', {}, `Policy history: ${key}`), table([
+          ['Revision', (r) => r.revision], ['Value', (r) => `${r.value} ${r.unit}`], ['Effective from', (r) => fmtDT(r.effective_at)],
+          ['Changed by', (r) => r.actor_user_id ? '#' + r.actor_user_id : 'migration baseline'], ['Reason', (r) => r.change_reason],
+        ], revisions.items), pager(revisions, (offset) => showHistory(key, offset)));
+      } catch (e) { toast(e.message, 'bad'); }
+    };
+    box.append(h('p', { class: 'muted' }, 'Law, court directions, guidance and product policy have separate source labels. Every value change creates a revision with its reason, actor and time. History starts at the provenance migration; earlier revisions are unavailable.'),
       table([['Key', (r) => h('code', {}, r.param_key)], ['Value', (r) => [h('strong', {}, Number(r.value)), ' ', r.unit]], ['Meaning', (r) => r.description],
+        ['Basis', (r) => badge(sourceByCode.get(r.source_code)?.source_type || 'UNCLASSIFIED', r.is_assumption ? 'warn' : 'info')],
         ['Legal reference', (r) => [r.legal_ref, ' ', r.is_assumption && badge('ASSUMPTION', 'warn')]], ['Updated', (r) => fmtDT(r.updated_at)],
-        ['', (r) => admin ? h('details', {}, h('summary', {}, 'Change'), form([{ name: 'value', label: 'New value', type: 'number', step: 'any', required: true }],
-          async (v) => { await api('PATCH', `/rules/${r.param_key}`, v); toast('Rule changed and audited.'); location.reload(); }, { submit: 'Change rule' })) : '']], data.items));
+        ['Revision', (r) => h('button', { type: 'button', class: 'link', onclick: () => showHistory(r.param_key) }, `View revision ${r.revision}`)],
+        ['', (r) => admin ? h('details', {}, h('summary', {}, 'Change'), form([{ name: 'value', label: 'New value', type: 'number', step: 'any', required: true },
+          { name: 'reason', label: 'Reason for changing this policy', type: 'textarea', required: true, attrs: { minlength: 10, maxlength: 1000 } }],
+          async (v) => { await api('PATCH', `/rules/${r.param_key}`, v); toast('Rule changed and audited.'); location.reload(); }, { submit: 'Change rule' })) : '']], data.items), history,
+      h('details', {}, h('summary', {}, 'Source register and applicability'), table([
+        ['Basis', (s) => badge(s.source_type, 'info')],
+        ['Source', (s) => s.source_url ? h('a', { href: s.source_url, target: '_blank', rel: 'noopener noreferrer' }, s.title) : s.title],
+        ['Version / clause', (s) => `${s.source_version} · ${s.citation_clause}`], ['Applicability', (s) => s.applicability],
+      ], sources.items)));
   };
 
   const auditTab = async (box) => {
@@ -64,6 +83,6 @@ export default async function (root) {
 
   const items = [];
   if (admin) items.push({ id: 'users', label: 'Users', render: usersTab });
-  items.push({ id: 'rules', label: 'Rules (law as data)', render: rulesTab }, { id: 'audit', label: 'Audit log', render: auditTab });
+  items.push({ id: 'rules', label: 'Policy and sources', render: rulesTab }, { id: 'audit', label: 'Audit log', render: auditTab });
   root.append(tabs(items));
 }

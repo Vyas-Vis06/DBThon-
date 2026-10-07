@@ -60,7 +60,7 @@ python scripts/run_sql.py database/queries/04_division_and_anti_join.sql
 
 ## Real PostgreSQL route
 
-1. Start a server. With Docker (not exercised in CI; the official image needs nothing extra):
+1. Start a server. With Docker (the PostgreSQL 16 service path is also configured in CI):
 
    ```bash
    docker run -d --name zeroentry-pg -e POSTGRES_PASSWORD=<choose-one> -p 5432:5432 postgres:16
@@ -80,9 +80,11 @@ python scripts/run_sql.py database/queries/04_division_and_anti_join.sql
    ```
 
 4. Serve: `python -m uvicorn --factory zeroentry.main:create_app --port 8000`
-5. Run the absence scan once: sign in as `engineer@` and press **Run the absence scan now** on the shadow-entry screen (or
-   `POST /api/v1/detections/scan`). In a real deployment schedule it (cron or `pg_cron`); see
-   [ARCHITECTURE.md](ARCHITECTURE.md#detection-runs-as-a-scan-not-a-daemon).
+5. Automatic maintenance runs at startup and every `SAFETY_SWEEP_INTERVAL_SECONDS` (default 30). It commits safety stops
+   independently of evidence scans, retries failures on the next tick, and uses advisory transaction locks across processes.
+   Set the interval to 0 only if an external scheduler calls `sweep_permit_safety()` and `scan_shadow_entries(now())`.
+   An engineer/admin can run `POST /api/v1/maintenance/sweep` or `/detections/scan` manually. Process downtime delays
+   time-only decisions; field monitoring and an operational response remain necessary.
 
 `scripts/db.py bootstrap` and `reset` are tested against a PostgreSQL 16 server (`tests/db/test_db_script.py`).
 
@@ -102,3 +104,10 @@ seeder (it refuses).
 | `TimeoutExpired ... pg_ctl ... start` or an `AssertionError` from pgserver right after a crash or a forced kill | PostgreSQL is replaying its log (crash recovery), which can outlast pgserver's 10-second start timeout. Wait half a minute and run `dev.py` again. Stop it with Ctrl+C, not by killing the window, to avoid this. |
 | PowerShell will not run `Activate.ps1` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or skip activation and call `.venv\Scripts\python` directly. |
 | `docs/SCHEMA_REFERENCE.md is out of date` in the tests | You changed a migration or router: `python scripts/gen_docs.py` and commit the result. |
+
+## Distribution contract
+
+The supported migration/seed workflow uses this source checkout. The wheel contains the runtime API, HTML shell and static
+assets, and can run against an already migrated database. It does not bundle repository Alembic/seeds/scripts; keep a
+source checkout for database deployment. CI separately installs a built wheel and runs `scripts/check_wheel.py` to prevent
+editable-install asset omissions.

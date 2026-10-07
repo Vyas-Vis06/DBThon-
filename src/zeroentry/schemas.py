@@ -268,6 +268,7 @@ class ReviewIn(In):
 
 class RuleValueIn(In):
     value: Decimal
+    reason: Annotated[str, Field(min_length=10, max_length=1000)]
 
 
 class RuleToggleIn(In):

@@ -4,11 +4,11 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 
 from ..deps import DB, Paging, Principal, STAFF, paged, require, to_dict
 from ..errors import Forbidden, NotFound, Unprocessable
-from ..models import AppUser, AuditLog, Role, RuleParameter, UserSession
+from ..models import AppUser, AuditLog, PolicySource, Role, RuleParameter, RuleParameterHistory, UserSession
 from ..schemas import RuleValueIn, UserCreateIn, UserUpdateIn
 from ..security import hash_password
 
@@ -94,6 +94,26 @@ def list_rules(db: DB, principal: Principal = Depends(require())):
     return {"items": [to_dict(r) for r in db.scalars(select(RuleParameter).order_by(RuleParameter.param_key))]}
 
 
+@router.get("/policy-sources")
+def policy_sources(db: DB, principal: Principal = Depends(require())):
+    """Classified citations and applicability limits for configured law/guidance/product policy."""
+    return {"items": [to_dict(r) for r in db.scalars(select(PolicySource).order_by(PolicySource.source_code))]}
+
+
+@router.get("/rules/{param_key}/history")
+def rule_history(param_key: str, db: DB, page: Paging, principal: Principal = Depends(require())):
+    if db.get(RuleParameter, param_key) is None:
+        raise NotFound("No such rule parameter.")
+    return paged(db, select(RuleParameterHistory).where(RuleParameterHistory.param_key == param_key)
+                 .order_by(RuleParameterHistory.revision.desc()), page)
+
+
+@router.post("/maintenance/sweep")
+def sweep_safety(db: DB, principal: Principal = Depends(require("ADMIN", "ENGINEER"))):
+    """Run the current-time safety sweep now; automatic ticks call the same database function."""
+    return {"stopped": db.scalar(text("SELECT sweep_permit_safety()"))}
+
+
 @router.patch("/rules/{param_key}")
 def set_rule(param_key: str, body: RuleValueIn, db: DB, principal: Principal = Depends(require("ADMIN"))):
     row = db.scalar(select(RuleParameter).where(RuleParameter.param_key == param_key).with_for_update())
@@ -102,8 +122,10 @@ def set_rule(param_key: str, body: RuleValueIn, db: DB, principal: Principal = D
     low, high = BOUNDS.get(param_key, (0, 10**12))
     if not Decimal(str(low)) <= body.value <= Decimal(str(high)):
         raise Unprocessable(f"{param_key} must be between {low} and {high}.")
-    row.value, row.updated_by, row.updated_at = body.value, principal.user_id, datetime.now(timezone.utc)
+    db.execute(text("SELECT set_config('app.rule_change_reason', :reason, true)"), {"reason": body.reason})
+    row.value = body.value
     db.flush()
+    db.refresh(row)  # actor, receipt time and revision are owned by the database trigger
     return to_dict(row)
 
 

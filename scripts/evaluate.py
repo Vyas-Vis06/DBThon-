@@ -72,13 +72,59 @@ def _lawful_permit(conn, f: Factory, log_both: bool) -> int:
     s = f.gate_scenario(at)
     conn.execute("SELECT * FROM authorise_entry(%s, %s, %s)", (s["permit"], s["supervisor"], at))
     for e in ("e1", "e2") if log_both else ("e1",):
-        conn.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by, recorded_at) "
-                     "VALUES (%s, %s, tstzrange(%s, %s), %s, %s)",
-                     (s["permit"], s[e], at + 10 * MIN, at + 40 * MIN, s["supervisor"], at + 45 * MIN))
+        conn.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by) "
+                     "VALUES (%s, %s, tstzrange(%s, %s), %s)",
+                     (s["permit"], s[e], at + 10 * MIN, at + 40 * MIN, s["supervisor"]))
+    _trusted_backfill_entry_receipts(conn, s["permit"], at + 45 * MIN)
     conn.execute("UPDATE entry_permit SET status = 'CLOSED', ended_at = %s WHERE permit_id = %s", (at + H, s["permit"]))
     conn.execute("UPDATE complaint SET raised_at = %s, status = 'RESOLVED', resolved_at = %s, resolution_code = 'CLEARED' "
                  "WHERE complaint_id = %s", (at - 24 * H, T0, s["complaint"]))
     return s["complaint"]
+
+
+def _trusted_backfill_entry_receipts(conn: psycopg.Connection, permit_id: int, received_at: datetime) -> None:
+    """Backfill one historical synthetic fixture after it passes the live entry guard.
+
+    This runs only as the owner in the disposable evaluation database. The trigger is disabled for one permit and one
+    update, inside a transaction; runtime roles cannot perform this operation or choose receipt timestamps.
+    """
+    with conn.transaction():
+        conn.execute("ALTER TABLE entry_log DISABLE TRIGGER trg_entry_log_guard")
+        conn.execute("UPDATE entry_log SET recorded_at = %s, exit_recorded_at = %s WHERE permit_id = %s",
+                     (received_at, received_at, permit_id))
+        conn.execute("ALTER TABLE entry_log ENABLE TRIGGER trg_entry_log_guard")
+
+
+def _trusted_backfill_history_receipts(conn: psycopg.Connection) -> None:
+    """Give only evaluator-generated past events their labelled receipt times after trigger-guarded inserts.
+
+    The evaluator connects as the database owner to a throwaway cluster. Synthetic rows first pass their normal guards;
+    this narrow, rollbackable owner import corrects only rows tagged by the history generator. It is not an application
+    operation and does not claim that synthetic event times reflect physical sensor or worker truth.
+    """
+    with conn.transaction():
+        conn.execute("ALTER TABLE machine_deployment DISABLE TRIGGER trg_machine_deployment_outcome_guard")
+        conn.execute("ALTER TABLE entry_log DISABLE TRIGGER trg_entry_log_guard")
+        conn.execute("""
+            UPDATE machine_deployment d
+               SET outcome_recorded_at = d.recorded_at
+              FROM job j JOIN complaint c ON c.complaint_id = j.complaint_id
+             WHERE d.job_id = j.job_id AND c.description = 'Synthetic history'
+               AND d.outcome IS NOT NULL AND d.outcome_recorded_at IS DISTINCT FROM d.recorded_at
+        """)
+        conn.execute("""
+            UPDATE entry_log e
+               SET recorded_at = upper(e.period) + interval '5 minutes',
+                   exit_recorded_at = upper(e.period) + interval '5 minutes'
+              FROM entry_permit p JOIN job j ON j.job_id = p.job_id
+              JOIN complaint c ON c.complaint_id = j.complaint_id
+             WHERE e.permit_id = p.permit_id AND c.description = 'Synthetic history (manual)'
+               AND NOT upper_inf(e.period)
+               AND (e.recorded_at IS DISTINCT FROM upper(e.period) + interval '5 minutes'
+                 OR e.exit_recorded_at IS DISTINCT FROM upper(e.period) + interval '5 minutes')
+        """)
+        conn.execute("ALTER TABLE entry_log ENABLE TRIGGER trg_entry_log_guard")
+        conn.execute("ALTER TABLE machine_deployment ENABLE TRIGGER trg_machine_deployment_outcome_guard")
 
 
 def _build(conn, f: Factory, w: dict, cls: str, i: int) -> int:
@@ -194,6 +240,27 @@ def _noop(conn, f, s):
     pass
 
 
+def _prepare_short_rest(conn, f: Factory, s: dict) -> None:
+    """Set up a valid current permit with a recent, recorded 90-minute stretch by the same entrant."""
+    _authorise_raw(conn, s)
+
+    prior_at = s["at"] - 2 * H
+    prior_permit = f.permit(s["job"], s["supervisor"])
+    for name, role in (("e1", "ENTRANT"), ("e2", "ENTRANT"), ("standby", "STANDBY"), ("sup_worker", "SUPERVISOR")):
+        f.crew(prior_permit, s[name], role)
+    for name in ("e1", "e2"):
+        f.issue_gear(prior_permit, s[name], s["supervisor"])
+    for level in ("TOP", "MID", "BOTTOM"):
+        f.reading(prior_permit, s["detector"], level, prior_at - 5 * MIN, s["supervisor"])
+    prior = {**s, "permit": prior_permit, "at": prior_at}
+    _authorise_raw(conn, prior)
+    # This completed historical report passed the guard. Its receipt is now, which anchors the rest interval even
+    # though the reported 90-minute stretch ended 30 minutes earlier.
+    conn.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by) "
+                 "VALUES (%s, %s, tstzrange(%s, %s), %s)",
+                 (prior_permit, s["e1"], prior_at + 10 * MIN, prior_at + 100 * MIN, s["supervisor"]))
+
+
 # (rule, the invalid write, setup(conn, f, s), attack(conn, f, s)). s is a fresh permit that passes every clause.
 ATTACKS = [
     ("BR-01", "Draft a permit for a job that has no written mechanisation waiver", _noop,
@@ -222,10 +289,11 @@ ATTACKS = [
                                {"j": s["job"], "u": s["supervisor"], "at": s["at"]})),
     ("BR-09", "Add an un-geared entrant to an authorised permit", lambda c, f, s: _authorise_raw(c, s),
      lambda c, f, s: f.crew(s["permit"], f.worker(s["contractor"]), "ENTRANT")),
-    ("BR-10", "Log a 95-minute continuous entry", lambda c, f, s: _authorise_raw(c, s),
+    ("BR-10", "Start a new entry before the required 30-minute rest after a 90-minute stretch",
+     _prepare_short_rest,
      lambda c, f, s: c.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by) "
-                               "VALUES (%s, %s, tstzrange(%s, %s), %s)",
-                               (s["permit"], s["e1"], s["at"] + 10 * MIN, s["at"] + 105 * MIN, s["supervisor"]))),
+                               "VALUES (%s, %s, tstzrange(clock_timestamp(), NULL, '[)'), %s)",
+                               (s["permit"], s["e1"], s["supervisor"]))),
     ("BR-11", "Re-open a CLOSED permit", lambda c, f, s: _closed(c, s),
      lambda c, f, s: c.execute("UPDATE entry_permit SET status = 'AUTHORISED', ended_at = NULL WHERE permit_id = %s",
                                (s["permit"],))),
@@ -258,11 +326,16 @@ ATTACKS = [
 ]
 
 
-def _probe(conn, setup, attack) -> psycopg.Error | None:
+def _probe(conn, setup, attack, *, at: datetime = T0, all_day_for_probe: bool = False) -> psycopg.Error | None:
     """Run one attack on a fresh compliant permit; everything is rolled back. Returns the refusal, or None if accepted."""
     with conn.transaction(force_rollback=True):
+        if all_day_for_probe:
+            # Keep this one experiment focused on the rest rule regardless of the machine's local hour. These policy
+            # changes are confined to the rolled-back evaluation probe and apply identically in both variants.
+            conn.execute("UPDATE rule_parameter SET value = 0 WHERE param_key = 'daylight_start_hour'")
+            conn.execute("UPDATE rule_parameter SET value = 24 WHERE param_key = 'daylight_end_hour'")
         f = Factory(conn)
-        s = f.gate_scenario(T0)
+        s = f.gate_scenario(at)
         setup(conn, f, s)
         try:
             with conn.transaction():
@@ -282,10 +355,18 @@ def _outcome(err: psycopg.Error | None) -> dict:
 
 def enforcement(conn: psycopg.Connection) -> list[dict]:
     """Every attack against ZeroEntry, then the same attacks after the rule triggers are disabled in this database."""
-    rows = [{"rule": r, "write": w, "zeroentry": _outcome(_probe(conn, setup, attack))} for r, w, setup, attack in ATTACKS]
+    e2_at = datetime.now(T0.tzinfo).replace(second=0, microsecond=0)
+
+    def probe(rule, setup, attack):
+        if rule == "BR-10":
+            return _probe(conn, setup, attack, at=e2_at, all_day_for_probe=True)
+        return _probe(conn, setup, attack)
+
+    rows = [{"rule": r, "write": w, "zeroentry": _outcome(probe(r, setup, attack))}
+            for r, w, setup, attack in ATTACKS]
     conn.execute(BASELINE_SQL.read_text(encoding="utf-8"))
-    for row, (_, _, setup, attack) in zip(rows, ATTACKS):
-        row["baseline"] = _outcome(_probe(conn, setup, attack))
+    for row, (rule, _, setup, attack) in zip(rows, ATTACKS):
+        row["baseline"] = _outcome(probe(rule, setup, attack))
     return rows
 
 
@@ -339,11 +420,13 @@ def _drop(indexes: list[str]) -> list[sql.Composable]:
 
 
 def _before_0011(conn) -> list[sql.Composable]:
-    """The detection views as 0007 defined them: the grace CTE inlined, so rule_num() runs once per joined row."""
+    """Same final temporal detection views, with only the 0011 MATERIALIZED optimization removed."""
     ddl = []
     for view in ("v_shadow_se1", "v_shadow_se2"):
         body = conn.execute("SELECT pg_get_viewdef(%s::regclass) AS d", (view,)).fetchone()["d"]
         assert "WITH g AS MATERIALIZED (" in body, f"{view} no longer has the 0011 shape"
+        if view == "v_shadow_se1":
+            assert "outcome_recorded_at" in body, "the benchmark must retain temporal outcome-receipt semantics"
         ddl.append(sql.SQL("CREATE OR REPLACE VIEW {} WITH (security_invoker = true) AS ").format(sql.Identifier(view))
                    + sql.SQL(body.replace("WITH g AS MATERIALIZED (", "WITH g AS (", 1)))      # our own catalog text
     return ddl
@@ -366,6 +449,7 @@ def performance(conn: psycopg.Connection, sizes: list[int], reps: tuple[int, int
         log(f"  E3: growing history to {size:,} complaints ...")
         if size > have:
             conn.execute("SELECT eval_add_history(%s)", (size - have,))
+            _trusted_backfill_history_receipts(conn)
         conn.execute("ANALYZE")
         count = lambda q: conn.execute(q).fetchone()["n"]  # noqa: E731
         row = {
@@ -435,13 +519,13 @@ def render(results: dict, meta: dict) -> str:
         f"recorded 30 h later, after the first scan): ZeroEntry kept **{e1['late']['zeroentry_kept_for_review']}** for "
         f"human review (`EVIDENCE_RECEIVED`) with **{e1['late']['zeroentry_invoices_still_held']}** of their invoices "
         f"still held; the naive query silently dropped **{e1['late']['naive_silently_cleared']}** from its list and "
-        "holds nothing.",
+        "has no hold mechanism.",
         "",
         "## E2 Enforcement (one invalid write per rule, any client)",
         "",
         "Baseline = the same schema and constraints with every rule trigger disabled "
         "(`database/evaluation/rules_in_app_code.sql`): the rules live in application code, so any other client "
-        "(a script, a second app, a SQL console, a buggy endpoint) is unconstrained.",
+        "(a script, a second app, a SQL console, a buggy endpoint) would not run those checks.",
         "",
         "| Rule | Invalid write | ZeroEntry | Baseline (rules in app code) |", "|---|---|---|---|",
         *(f"| {r['rule']} | {r['write']} | "
@@ -451,6 +535,11 @@ def render(results: dict, meta: dict) -> str:
         f"**Refused: ZeroEntry {sum(r['zeroentry']['refused'] for r in e2)}/{len(e2)}, baseline "
         f"{sum(r['baseline']['refused'] for r in e2)}/{len(e2)}.** SQLSTATE class `ZE` is a ZeroEntry rule (trigger or "
         "function); `23xxx` is a declarative constraint that both designs share.",
+        "",
+        "These synthetic probes measure database rejection of the listed write shapes. They do not prove that reported "
+        "event times are physically accurate, authenticate a worker, or establish detector/sensor authenticity. The "
+        "evaluation uses the database owner for controlled fixture imports; a privileged database owner or superuser "
+        "can alter data or disable triggers in either design.",
         "",
         "## E3 Performance and scalability (history grows)",
         "",

@@ -27,8 +27,7 @@ CI runs the same command on Linux and Windows (Python 3.11 and 3.12) and macOS (
    transaction, so commit, rollback, locks and triggers behave as in production, and no test can see another's rows.
 4. Read-only modules may share one clone (`module_db`); the role × endpoint matrix uses this (`tests/api/conftest.py`).
 
-Rows are built by `tests/factories.py` through the real constraints and triggers (nothing is bypassed): if a factory can build a
-row, the row is legal. `Factory.gate_scenario(at)` builds a permit that passes every clause, so a test breaks exactly one thing.
+Live behavior fixtures use real constraints and triggers. Historical synthetic fixtures explicitly bypass only receipt/admission triggers during owner-controlled import, then restore them. They preserve reported event time separately from server receipt time and are not runtime permissions. `Factory.gate_scenario(at)` builds a permit that passes every clause, so a test breaks exactly one thing.
 `tests/helpers.py` has `expect(...)` (assert a statement fails with a given SQLSTATE and message) and `act_as(...)` (set the
 RLS context on a `ze_app` connection).
 
@@ -39,7 +38,7 @@ RLS context on a `ze_app` connection).
 | Unit (no database) | `tests/unit/` | password and token rules, throttle, configuration validation, error mapping, URL building, docs links and rule IDs |
 | Database behaviour | `tests/db/` | constraints reject bad rows; **every gate clause has a pass and a fail case**; the gate cannot be bypassed (raw `UPDATE`, raw `INSERT`, concurrent sessions); entry rules (90 minutes, daylight, overlap, window, role); waivers; `record_incident` is atomic (forced failure leaves nothing); detection scenarios; holds; privileges of `ze_app`; row-level security per role; the seed and every demonstration query run; docs match the database |
 | Evaluation | `tests/db/test_evaluation.py` | `scripts/evaluate.py` still runs, and its claims hold at a tiny scale: detection exact on every labelled class while the naive anti-join is not; 18 of 18 invalid writes refused while the rules-in-app-code baseline refuses 1; the history generator goes through the real gate; the detection views keep the parameter CTE materialised (migration `0011`). Counts only, never timings |
-| API | `tests/api/` | sessions, lockout, throttle, CSRF, cookie flags; **every endpoint probed as every role** (`test_rbac.py`, 176 cases); end-to-end workflows; scoping for contractors and workers; validation errors; UI files served with a strict CSP and no markup built from data; the endpoint table matches the code |
+| API | `tests/api/` | sessions, lockout, throttle, CSRF, cookie flags; **every endpoint probed as every role** (`test_rbac.py`, parameterized matrix); end-to-end workflows; scoping for contractors and workers; validation errors; UI files served with a strict CSP and no markup built from data; the endpoint table matches the code |
 
 ## The six detection scenarios (the brief's checklist)
 
@@ -74,5 +73,20 @@ When adding a rule, make the test fail first. Examples that were done while buil
 * **The browser UI's behaviour.** Every screen was walked through by hand in a browser (list in
   [DEV_LOG.md](development/DEV_LOG.md)); `tests/api/test_web.py` checks that screens are served, the CSP is strict and no screen
   builds markup from data. There is no headless-browser suite.
-* **A real (non-embedded) PostgreSQL server.** The schema needs nothing beyond PostgreSQL 15+, but CI runs only the embedded
-  server. `scripts/db.py bootstrap` against a real server is documented in [SETUP.md](SETUP.md) and was not run in CI.
+* **Independent field truth.** Tests use synthetic records. They do not establish real gas values, equipment use, rescue response,
+  legal certification or field detection accuracy.
+
+## PostgreSQL service and distribution verification
+
+CI additionally runs serial tests against a disposable `postgres:16` service and installs a built wheel to smoke the HTML,
+JS and CSS. To use the service harness, set `ZEROENTRY_TEST_PG_URI` to a **disposable test server** and run `pytest -n 0`.
+The harness creates/drops its own databases and bootstrap tests change the shared `ze_app` role password. It must never
+point at an existing development or production cluster. Serial execution avoids password races between workers.
+
+## Comparative evaluation
+
+`scripts/evaluate_temporal.py` always creates and cleans its own embedded cluster. It runs labeled 1k/10k/100k synthetic complaint
+sets through an untimed existence-only baseline and the actual SE1 query as `ze_app` with ENGINEER context. The output
+includes confusion matrices, each latency sample, warm-up/repetition methodology and EXPLAIN (ANALYZE, BUFFERS) plans.
+Historical outcome receipts are imported by a narrowly disabled owner-only timestamp trigger. The late-finalization class
+uses the real live guard. The [results](evaluation/RESULTS.md) classify evidence gaps, not physical entries.

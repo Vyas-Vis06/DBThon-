@@ -51,19 +51,22 @@ def test_rule_parameters_are_listed_with_legal_references_and_assumptions_are_fl
 
 def test_rule_changes_are_range_checked_audited_and_change_the_gate(api, world):
     admin, sup = api("admin"), api("supervisor")
-    refused(admin.patch(f"{API}/rules/gas_max_age_min", json={"value": 100000}), 422, message="between")
-    refused(admin.patch(f"{API}/rules/min_crew_size", json={"value": 1}), 422, message="between")      # cannot weaken below the statutory floor
-    refused(admin.patch(f"{API}/rules/no_such_rule", json={"value": 1}), 404)
-    refused(admin.patch(f"{API}/rules/min_crew_size", json={"value": "abc"}), 422)
+    refused(admin.patch(f"{API}/rules/gas_max_age_min", json={"value": 100000, "reason": "Synthetic test policy adjustment"}), 422, message="between")
+    refused(admin.patch(f"{API}/rules/min_crew_size", json={"value": 1, "reason": "Synthetic test policy adjustment"}), 422, message="between")      # cannot weaken below the statutory floor
+    refused(admin.patch(f"{API}/rules/no_such_rule", json={"value": 1, "reason": "Synthetic test policy adjustment"}), 404)
+    refused(admin.patch(f"{API}/rules/min_crew_size", json={"value": "abc", "reason": "Synthetic test policy adjustment"}), 422)
     _, _, permit = build_permit(api, world)
-    ok(admin.patch(f"{API}/rules/min_crew_size", json={"value": 5}))                                  # tighten: 4 people are now too few
+    ok(admin.patch(f"{API}/rules/min_crew_size", json={"value": 5, "reason": "Synthetic test policy adjustment"}))                                  # tighten: 4 people are now too few
     denied = ok(sup.post(f"{API}/permits/{permit['permit_id']}/authorise"))
     assert denied["failed"] == ["CREW_SIZE"] and "4 of the required 5" in denied["clauses"][5]["detail"]
-    ok(admin.patch(f"{API}/rules/min_crew_size", json={"value": 4}))
+    ok(admin.patch(f"{API}/rules/min_crew_size", json={"value": 4, "reason": "Synthetic test policy adjustment"}))
     assert ok(sup.post(f"{API}/permits/{permit['permit_id']}/authorise"))["authorised"] is True
     trail = ok(api("auditor").get(f"{API}/audit-log?table_name=rule_parameter&row_pk=min_crew_size"))
-    assert [r["new_data"]["value"] for r in reversed(trail["items"])] == [5, 4]
-    assert all(r["actor_user_id"] == world["users"]["admin"]["id"] for r in trail["items"])
+    # Migration-time provenance corrections are also audited with a NULL actor; keep this assertion
+    # scoped to the two authenticated administrator changes performed by this test.
+    admin_changes = [r for r in reversed(trail["items"]) if r["actor_user_id"] is not None]
+    assert [r["new_data"]["value"] for r in admin_changes] == [5, 4]
+    assert all(r["actor_user_id"] == world["users"]["admin"]["id"] for r in admin_changes)
 
 
 def test_the_audit_log_is_filterable_and_never_contains_password_hashes(api, world):
