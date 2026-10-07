@@ -68,7 +68,7 @@ per-rule tables), because they move a little from run to run and machine to mach
 | **E2** invalid writes refused | 18 of 18 | 1 of 18 (only the `UNIQUE` constraint both designs share) | 17 rule violations that any non-UI client could commit are refused |
 | **E3a** entry decision, 1k to 100k complaints | about 2 ms median and about 50 buffers at every size | without its indexes: several times slower at 100k, and growing | the cost of a decision does not grow with history |
 | **E3b** detection candidate query, 100k complaints | about 0.3 s, about 57,000 buffers | without its indexes: tens of seconds, about 7.8 million buffers | about 100x faster, over 100x less data processed |
-| **E3b** detection before and after migration `0011`, 100k complaints | candidate query about 0.3 s; full scan under a second | the same views before `0011`: about 4x longer and 2.7x more buffers; full scan several seconds | found by this evaluation; scan 4x to 12x faster across sizes |
+| **E3b** detection before and after migration `0011`, 100k complaints | candidate query about 0.3 s; full scan under a second | the same views before `0011`: about 4x longer and 2.7x more buffers; full scan several seconds | found by this evaluation; scan 4x to 6x faster across sizes |
 | **E4** concurrent races that commit a broken proof | 0 of 4 | before migration `0010`: 4 of 4 | the gate is race-free |
 
 Reading the numbers:
@@ -86,7 +86,8 @@ Reading the numbers:
 * **The evaluation found a real defect (0011).** The first run showed the detection views calling `rule_num()` once per joined
   row: PostgreSQL 12+ inlines a CTE that is referenced once. Materialising it makes the candidate query about 4x faster with
   about 2.7x fewer buffers (the same ratio in every run so far), with identical results (`rule_num()` is `STABLE`). The full
-  scan gained 4x to 12x across sizes in the published run; the exact factor depends on the plan PL/pgSQL settles on. A test now checks the plan
+  scan gained 4x to 6x across sizes in the published run (one earlier run measured more; the exact factor depends on the
+  plan PL/pgSQL settles on). A test now checks the plan
   keeps the CTE ([ADR-013](decisions/README.md#adr-013--measure-against-a-stated-baseline-read-rule-parameters-once-per-statement-migration-0011)).
 * **E4** is not re-run by the script: `tests/db/test_concurrency.py` reproduces the four races, and the 2026-10-07 build
   session recorded each of them committing before `0010` and being refused after ([DEV_LOG](development/DEV_LOG.md)).

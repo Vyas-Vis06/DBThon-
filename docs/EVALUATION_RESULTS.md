@@ -4,9 +4,9 @@
 
 | Run | |
 |---|---|
-| Date | 2026-10-07 11:50 UTC |
+| Date | 2026-10-07 12:07 UTC |
 | Command | `python scripts/evaluate.py` |
-| Commit | `e863269` (plus uncommitted changes, if any) |
+| Commit | `7c42f62` (plus uncommitted changes, if any) |
 | Machine | Windows 10, 22 logical CPUs, AMD64 |
 | Python / PostgreSQL | 3.11.2 / 16.2 (embedded, default settings) |
 
@@ -32,7 +32,7 @@ ZeroEntry = alerts persisted by `scan_shadow_entries()`; naive = the proposal's 
 | `machine_failed_only` | the only machine deployment FAILED | 20 | yes | 20 | 20 |
 | `entrant_not_logged` | lawful permit closed, but one entrant has no entry log | 20 | yes | 20 | 0 |
 
-**Late paperwork** (20 complaints resolved with no evidence; a CLEARED machine log is recorded 30 h later, after the first scan): ZeroEntry kept **20** for human review (`EVIDENCE_RECEIVED`, invoice still held); the naive query silently dropped **20** from its list.
+**Late paperwork** (20 invoiced complaints resolved with no evidence; a CLEARED machine log is recorded 30 h later, after the first scan): ZeroEntry kept **20** for human review (`EVIDENCE_RECEIVED`) with **20** of their invoices still held; the naive query silently dropped **20** from its list and holds nothing.
 
 ## E2 Enforcement (one invalid write per rule, any client)
 
@@ -43,17 +43,17 @@ Baseline = the same schema and constraints with every rule trigger disabled (`da
 | BR-01 | Draft a permit for a job that has no written mechanisation waiver | refused, `ZE002`: No entry permit without a written mechanisation waiver for the job (mechanised cleaning comes first) | **accepted** |
 | BR-02 | File a MACHINE_FAILED waiver when no machine has failed on the complaint | refused, `ZE002`: Reason MACHINE_FAILED needs a recorded FAILED machine deployment for this complaint | **accepted** |
 | BR-03 | Authorise a permit whose crew has no standby (raw UPDATE) | refused, `ZE001`: Entry denied. Unmet legal clauses: - A standby (top man) who does not enter: 0 standby (top man) assigned | **accepted** |
-| BR-04 | Authorise with an entrant whose medical fitness has expired | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every crew member is medically fit and trained on the day: NAM-T-00484: medical fitness expired on 2020 | **accepted** |
-| BR-05 | Authorise a job whose contractor is blacklisted | refused, `ZE001`: Entry denied. Unmet legal clauses: - Contractor is ACTIVE with a valid licence: Contractor Contractor 490 is BLACKLISTED | **accepted** |
-| BR-06 | Authorise when an entrant has no breathing apparatus | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every entrant holds every statutory protective-gear item: NAM-T-00506 missing: Breathing apparatus (SCB | **accepted** |
+| BR-04 | Authorise with an entrant whose medical fitness has expired | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every crew member is medically fit and trained on the day: NAM-T-00504: medical fitness expired on 2020 | **accepted** |
+| BR-05 | Authorise a job whose contractor is blacklisted | refused, `ZE001`: Entry denied. Unmet legal clauses: - Contractor is ACTIVE with a valid licence: Contractor Contractor 510 is BLACKLISTED | **accepted** |
+| BR-06 | Authorise when an entrant has no breathing apparatus | refused, `ZE001`: Entry denied. Unmet legal clauses: - Every entrant holds every statutory protective-gear item: NAM-T-00526 missing: Breathing apparatus (SCB | **accepted** |
 | BR-07 | Authorise after the latest BOTTOM reading showed H2S at 25 ppm | refused, `ZE001`: Entry denied. Unmet legal clauses: - BOTTOM atmosphere tested recently, by a calibrated detector, within limits: H2S 25.00 ppm is not below  | **accepted** |
 | BR-08 | Insert a permit that is born AUTHORISED | refused, `ZE003`: A permit is created as DRAFT; AUTHORISED is reachable only through the clause gate | **accepted** |
 | BR-09 | Add an un-geared entrant to an authorised permit | refused, `ZE003`: Crew and gear are frozen once a permit is AUTHORISED (cancel and re-issue instead) | **accepted** |
 | BR-10 | Log a 95-minute continuous entry | refused, `ZE002`: An entry of 95 minutes exceeds the 90 minute continuous-work limit | **accepted** |
 | BR-11 | Re-open a CLOSED permit | refused, `ZE003`: A permit cannot change from CLOSED to AUTHORISED | **accepted** |
-| BR-12 | Record a gas reading from a detector whose calibration had lapsed | refused, `ZE002`: Detector GD-T-00578 calibration expired on 2020-01-01: a reading taken on 2026-09-01 is refused | **accepted** |
-| BR-22 | Give a new job to a blacklisted contractor | refused, `ZE003`: Contractor Contractor 580 is BLACKLISTED and cannot be assigned jobs | **accepted** |
-| BR-23 | Approve an invoice that is on hold | refused, `ZE003`: Invoice INV-T-00601 is on hold (SHADOW_ENTRY) and cannot be approved | **accepted** |
+| BR-12 | Record a gas reading from a detector whose calibration had lapsed | refused, `ZE002`: Detector GD-T-00598 calibration expired on 2020-01-01: a reading taken on 2026-09-01 is refused | **accepted** |
+| BR-22 | Give a new job to a blacklisted contractor | refused, `ZE003`: Contractor Contractor 600 is BLACKLISTED and cannot be assigned jobs | **accepted** |
+| BR-23 | Approve an invoice that is on hold | refused, `ZE003`: Invoice INV-T-00621 is on hold (SHADOW_ENTRY) and cannot be approved | **accepted** |
 | BR-31 | A supervisor dismisses a shadow-entry alert (only an engineer may decide) | refused, `ZE006`: Only an active ENGINEER or ADMIN may decide a shadow-entry alert | **accepted** |
 | BR-34 | Raise a second alert for the same complaint and rule | refused, `23505`: duplicate key value violates unique constraint "uq_alert_per_complaint_rule" | refused, `23505`: duplicate key value violates unique constraint "uq_alert_per_complaint_rule" |
 | BR-36 | Rewrite an alert's lifecycle history | refused, `ZE003`: shadow_entry_alert_event is append-only: UPDATE is not allowed | **accepted** |
@@ -69,14 +69,14 @@ Every measurement is rolled back, so each repetition does the same work. Times i
 
 | Complaints | Permits | Gas readings | Decision median | Decision p95 | Without gate indexes (median) | Clause check buffers |
 |---|---|---|---|---|---|---|
-| 1,001 | 51 | 153 | 1.9 | 2.5 | 1.9 | 41 |
-| 10,001 | 501 | 1,503 | 1.7 | 2.4 | 2.6 | 50 |
-| 100,001 | 5,001 | 15,003 | 1.7 | 2.1 | 12.0 | 51 |
+| 1,001 | 51 | 153 | 1.8 | 2.8 | 1.8 | 41 |
+| 10,001 | 501 | 1,503 | 1.8 | 2.3 | 2.9 | 50 |
+| 100,001 | 5,001 | 15,003 | 1.6 | 2.8 | 12.6 | 51 |
 
 ### E3b Detection by absence (`scan_shadow_entries()` and the candidate query)
 
 | Complaints | Scan median / p95 | Scan before 0011 (median) | Candidate query ms / buffers | Before 0011 | Without scan indexes | Naive query ms / buffers | Naive flagged | ZeroEntry candidates |
 |---|---|---|---|---|---|---|---|---|
-| 1,001 | 10.5 / 12.9 | 43.7 | 3.9 / 491 | 14.3 / 1,483 | 6.5 / 1,043 | 0.7 / 37 | 48 | 19 |
-| 10,001 | 82.0 / 86.7 | 374.3 | 27.6 / 5,937 | 137.1 / 15,443 | 405.3 / 80,659 | 7.6 / 361 | 476 | 190 |
-| 100,001 | 734.7 / 783.1 | 8,854.1 | 334.5 / 56,897 | 1,417.3 / 152,142 | 37,064.0 / 7,814,993 | 84.3 / 16,064 | 4,751 | 1,900 |
+| 1,001 | 10.6 / 13.3 | 44.8 | 2.6 / 491 | 17.5 / 1,483 | 5.9 / 1,043 | 1.7 / 37 | 48 | 19 |
+| 10,001 | 87.1 / 92.1 | 400.1 | 28.2 / 5,937 | 128.7 / 15,443 | 410.2 / 80,659 | 7.4 / 361 | 476 | 190 |
+| 100,001 | 750.8 / 780.0 | 4,186.2 | 296.8 / 56,899 | 1,345.0 / 152,144 | 35,885.1 / 7,814,995 | 82.5 / 16,066 | 4,751 | 1,900 |

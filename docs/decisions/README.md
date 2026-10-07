@@ -106,6 +106,6 @@ Format: **context** → **decision** → **consequences** (including what it cos
   `0011` re-creates `v_shadow_se1` and `v_shadow_se2` with `WITH g AS MATERIALIZED`; `rule_num()` is `STABLE`, so results are
   unchanged. A test checks the plan keeps the CTE (`tests/db/test_evaluation.py`).
 * **Consequences.** At 100,000 complaints the candidate query is about 4x faster with about 2.7x fewer buffers, and the full
-  scan 4x to 12x faster across sizes (see [EVALUATION.md](../EVALUATION.md)). The evaluation is a
+  scan 4x to 6x faster across sizes (see [EVALUATION.md](../EVALUATION.md)). The evaluation is a
   repeatable command, and its counts (not its timings) are asserted in CI. Any future view that reads a parameter should
   materialise it the same way.

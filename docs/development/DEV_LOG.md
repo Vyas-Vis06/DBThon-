@@ -23,7 +23,7 @@ and no TRL statement.
   round them so a rerun does not make them wrong.
 * **Migration `0011`** (found by the first evaluation run): the detection views' one-row parameter CTE was inlined by PostgreSQL,
   so `rule_num()` ran once per joined row. `WITH g AS MATERIALIZED` makes the candidate query about 4x faster with 2.7x fewer
-  buffers (stable across runs) and the scan 4x to 12x faster across sizes, with identical results. ADR-013; `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`.
+  buffers (stable across runs) and the scan 4x to 6x faster across sizes, with identical results. ADR-013; `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`.
 * **Benchmark pitfall found and fixed:** with one warm-up, whichever variant ran first looked slower (PL/pgSQL re-plans for the
   first five calls of a session). `_timed()` now warms up six times; the first full run's E3b numbers were discarded. The
   results were then regenerated on the committed code, so the commit they name contains `evaluate.py`.
