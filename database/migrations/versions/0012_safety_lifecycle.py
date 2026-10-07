@@ -1,7 +1,7 @@
 """safety lifecycle
 
-Revision ID: 0011
-Revises: 0010
+Revision ID: 0012
+Revises: 0011
 """
 from zeroentry.migrate import run_sql_file
 

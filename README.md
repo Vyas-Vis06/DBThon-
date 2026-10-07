@@ -18,6 +18,9 @@ This is a tested software prototype over synthetic records. Source metadata sepa
 and product policy. The seeded gear applicability, delegated approval, compensation defaults and physical response need
 operator/domain review. [Policy and prior art](docs/POLICY_AND_PRIOR_ART.md) bounds the novelty claim.
 
+The upstream M6 evaluation and this release’s temporal evidence evaluation use stated synthetic baselines.
+See [EVALUATION.md](docs/EVALUATION.md) for current measurements and [SUBMISSION.md](docs/SUBMISSION.md) for the rubric map.
+
 ![The entry gate denying a permit, clause by clause](docs/img/entry-gate-denied.jpg)
 
 ## Quick start
@@ -46,13 +49,14 @@ python -m pytest -n auto               # about 500 tests in about 2 minutes; eac
 
 | Area | What | Verified by |
 |---|---|---|
-| Schema | 35 tables, enforced foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 13 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
+| Schema | 35 tables, enforced foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 14 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
 | Entry gate | division, immutable parents, current admission, 90-minute stretches/30-minute rest, stop/exit events and tested concurrent decisions | `tests/db/test_entry_gate.py`, `test_entry_rules.py`, `test_concurrency.py` |
 | Detection by absence | SE1 / SE2 anti-joins, grace window, idempotent scan, review with history, invoice holds with provenance | `tests/db/test_detection.py` (the six scenarios) |
 | Consequences | `record_incident()` procedure, compensation payments, holds | `tests/db/test_consequences.py` |
 | API | FastAPI, guarded operations, sessions, CSRF, lockout, six roles, scoped decision/event reads and row-level security | `tests/api/` (every endpoint × every role), `tests/db/test_rls.py` |
 | UI | no-build browser UI, strict CSP | walked through by hand; `tests/api/test_web.py` (no headless-browser tests) |
 | SQL showcase | joins, aggregates, search, division, anti-join, views, transactions, trigger refusals | `database/queries/`, each file run by `tests/db/test_demo_queries.py` |
+| Evaluation | accuracy, enforcement and latency against stated baselines, at up to 100,000 complaints | `python scripts/evaluate.py` ([EVALUATION.md](docs/EVALUATION.md)); counts asserted by `tests/db/test_evaluation.py` |
 
 CI runs the suite on Linux/Windows (Python 3.11/3.12), macOS (3.12), and a disposable PostgreSQL 16 service. A separate installed-wheel smoke checks the HTML/JS/CSS distribution.
 
@@ -64,13 +68,16 @@ CI runs the suite on Linux/Windows (Python 3.11/3.12), macOS (3.12), and a dispo
 | `database/seeds/` · `database/queries/` | deterministic demo data · annotated demonstration queries |
 | `src/zeroentry/` | the API (`routers/`, `deps.py`, `errors.py`, ...) and the browser UI (`web/`) |
 | `tests/` | `unit/`, `db/` (SQL behaviour), `api/` (HTTP and roles) |
-| `scripts/` | `dev.py` run everything · `db.py` migrate/bootstrap/new/reset · `seed.py` · `run_sql.py` · `gen_docs.py` |
+| `database/evaluation/` | the baselines and synthetic history used only by `scripts/evaluate.py` |
+| `scripts/` | `dev.py` run everything · `db.py` migrate/bootstrap/new/reset · `seed.py` · `run_sql.py` · `gen_docs.py` · `evaluate.py` |
 | `docs/` | design, API, setup, testing, decisions, development log |
 
 ## Documentation
 
 | Read | For |
 |---|---|
+| [docs/SUBMISSION.md](docs/SUBMISSION.md) | **for the judges:** the DBThon brief's eight components, five-step novelty, 30-mark rubric, SDG and TRL, each mapped to evidence |
+| [docs/EVALUATION.md](docs/EVALUATION.md) · [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) | how ZeroEntry is measured against conventional approaches · the generated numbers |
 | [PROJECT_SPEC.md](PROJECT_SPEC.md) | the problem, roles, business rules (`BR-nn`) and assumptions (`A-nn`) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components and the life of a request |
 | [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) · [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md) | why the schema looks like this (3NF analysis, gate, detection, locking) · ER diagrams |

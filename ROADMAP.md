@@ -6,11 +6,14 @@ Requirements live in [PROJECT_SPEC.md](PROJECT_SPEC.md); history of decisions in
 Legend: `[ ]` not started · `[-]` in progress · `[x]` implemented **and verified by a test or command named in the row**.
 A task is never `[x]` on "it compiles".
 
-## Current state (2026-10-07): read this first
+## Current state (2026-10-07, evening): read this first
 
 M0-M5 form the original implemented foundation. The audit hardening below adds three forward migrations (0012–0014),
 bringing the application to 35 tables. UI screens remain manually verified, without an automated browser suite.
 Earlier CI results describe the foundation; new branch CI results must be checked separately.
+
+Upstream M6 adds the measured E1–E4 comparison, submission/rubric map and applied migration `0011`
+([EVALUATION.md](docs/EVALUATION.md), [SUBMISSION.md](docs/SUBMISSION.md)). This release preserves its materialized parameter CTE optimization.
 
 Changed in the second session: the full documentation set and its drift tests; a real concurrency bug in the entry gate found and
 fixed (M2-08); Linux/macOS support for the embedded PostgreSQL (CI caught it); tests for `scripts/db.py`; the repository published
@@ -46,6 +49,7 @@ flowchart LR
   M2 --> M4
   M3 --> M4
   M4 --> M5[M5 UI + demo + acceptance]
+  M5 --> M6[M6 DBThon evaluation + submission]
 ```
 
 Rule of thumb: **each milestone must run and pass its tests before the next starts.** Docs are updated in the same
@@ -139,6 +143,19 @@ seed is idempotent, models match the DB.
 | M5-07 | Final acceptance pass against `docs/development/ACCEPTANCE_CHECKLIST.md` | [x] |
 | M5-08 | CI workflow (`.github/workflows/ci.yml`), green on GitHub Actions | [x] |
 
+## M6 DBThon 2026 evaluation and submission (needs M5)
+
+The brief is [docs/proposal/DBTHON2026_Challenge.pdf](docs/proposal/DBTHON2026_Challenge.pdf); what answers each part is in
+[docs/SUBMISSION.md](docs/SUBMISSION.md).
+
+| ID | Task | Status | Verified by |
+|---|---|---|---|
+| M6-01 | Evaluation harness `scripts/evaluate.py` with baselines in `database/evaluation/` (naive anti-join; rules in app code) | [x] | `tests/db/test_evaluation.py` (counts at a tiny scale, every CI run) |
+| M6-02 | Full run at 1k, 10k and 100k complaints; results generated, method and limits written | [x] | [EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) (2026-10-07), [EVALUATION.md](docs/EVALUATION.md) |
+| M6-03 | Fix found by the evaluation: detection views read the grace parameter once per statement (migration `0011`) | [x] | `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`; before/after columns in the results |
+| M6-04 | Submission guide: the brief's eight components, five-step novelty, rubric map, SDG targets (checked on sdgs.un.org), TRL | [x] | [SUBMISSION.md](docs/SUBMISSION.md); links checked by `tests/unit/test_docs.py` |
+| M6-05 | Statistics and legal references re-verified against their sources before presenting | [ ] | a person, not a test |
+
 ---
 
 ## Who can work on what (after M1)
@@ -165,3 +182,4 @@ Agree on those two files and the streams do not collide.
 * Field validation of SE1/SE2 precision and alert review; missing records alone do not establish physical entry.
 * More complete equipment applicability by task and shared versus individual equipment, reviewed with domain experts.
 * Production monitoring, notification delivery, backups, recovery drills and a legal/domain pilot review.
+* Incremental absence scans if measured volumes outgrow the full pass.

@@ -95,3 +95,16 @@ Format: **context** → **decision** → **consequences** (including what it cos
   `lock_permit()` (so RLS cannot hide the row). Chosen over `SERIALIZABLE` isolation, which would need retry logic in every caller.
 * **Consequences.** Concurrent edits to one permit wait for each other (permits are edited by one supervisor at a time, so the
   wait is negligible); the proof behind an `AUTHORISED` permit cannot change underneath it.
+
+### ADR-013 · Measure against a stated baseline; read rule parameters once per statement (migration 0011)
+
+* **Context.** The DBThon brief asks for measured improvement over a conventional approach. `scripts/evaluate.py` compares
+  ZeroEntry with the proposal's naive anti-join (detection) and with the same schema minus its rule triggers (enforcement), and
+  times both core operations as history grows. Its first run showed the detection views calling `rule_num()` once per joined row,
+  because PostgreSQL 12+ inlines a CTE that is referenced once.
+* **Decision.** Baselines live in `database/evaluation/` and run only in a throwaway database, never as migrations. Migration
+  `0011` re-creates `v_shadow_se1` and `v_shadow_se2` with `WITH g AS MATERIALIZED`; `rule_num()` is `STABLE`, so results are
+  unchanged. A test checks the plan keeps the CTE (`tests/db/test_evaluation.py`).
+* **Consequences.** The scan is 12x faster at 100,000 complaints (735 ms instead of 8.9 s; see [EVALUATION.md](../EVALUATION.md)). The evaluation is a
+  repeatable command, and its counts (not its timings) are asserted in CI. Any future view that reads a parameter should
+  materialise it the same way.

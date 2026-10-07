@@ -49,6 +49,16 @@ was run; `[~]` = done with a stated limit. Last full pass: 2026-10-07 (see [DEV_
 | [x] | Documentation set | README, PROJECT_SPEC, ROADMAP, AGENTS, CLAUDE, CONTRIBUTING, SECURITY, docs/ (ARCHITECTURE, DATABASE_DESIGN, ER_DIAGRAM, SCHEMA_REFERENCE, API_SPEC, SETUP, TESTING, decisions, development); links checked by `tests/unit/test_docs.py` |
 | [~] | Real PostgreSQL server | `scripts/db.py bootstrap`/`reset` tested against PostgreSQL 16 (embedded); the Docker command in SETUP was not run here |
 
+## DBThon 2026 brief ([SUBMISSION.md](../SUBMISSION.md))
+
+| | Requirement | Evidence |
+|---|---|---|
+| [x] | Problem, domain, existing system | [SUBMISSION.md §2](../SUBMISSION.md#2-what-each-team-must-demonstrate-the-briefs-eight-components) rows 1-3 |
+| [x] | Innovation and novelty in five steps (existing approach, limitation, proposed approach, novel component, measurable benefit) | [SUBMISSION.md §3](../SUBMISSION.md#3-novelty-in-the-briefs-five-steps) |
+| [x] | Evaluation against a conventional approach with metrics | [EVALUATION.md](../EVALUATION.md), generated [EVALUATION_RESULTS.md](../EVALUATION_RESULTS.md); counts asserted by `tests/db/test_evaluation.py` |
+| [x] | SDG alignment and societal impact | [SUBMISSION.md §5](../SUBMISSION.md#5-sdg-alignment-and-societal-impact) (target wording checked on sdgs.un.org, 2026-10-07) |
+| [~] | Technology readiness level | TRL 4 stated with the path to 5-6 ([SUBMISSION.md §6](../SUBMISSION.md#6-technology-readiness-level-and-demonstration)); not validated in a relevant environment |
+
 ## Open items (not claimed)
 
 * Source classifications have been checked against primary documents; this is not a complete legal or domain certification.

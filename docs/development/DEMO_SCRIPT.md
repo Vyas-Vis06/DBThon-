@@ -64,6 +64,16 @@ Show this change in policy history, and explain that astronomical daylight and r
     is in its revision history and the **Audit log**.
     > "The database owns the configured gate. Policy history explains the decision, and missing evidence remains reviewable."
 
+## If asked "how do you know it is better?" (30 s)
+
+Open [EVALUATION_RESULTS.md](../EVALUATION_RESULTS.md) (summary in [EVALUATION.md](../EVALUATION.md#results)): detection
+precision and recall against the naive anti-join, 18 of 18 invalid writes refused against 1 of 18 when the rules live in
+application code, and latency at 100,000 complaints. To show it is real, run a small version live (under a minute):
+
+```bash
+python scripts/evaluate.py --sizes 1000 --per-class 5 --out -
+```
+
 ## Backup: the same story in SQL only
 
 ```bash

@@ -1,18 +1,18 @@
-"""temporal evidence and invoice hold serialization
+"""detection parameters once
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0011
+Revises: 0010
 """
 from zeroentry.migrate import run_sql_file
 
-revision = "0013"
-down_revision = "0012"
+revision = "0011"
+down_revision = "0010"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    run_sql_file("0013_temporal_evidence_invoice_serialization.sql")
+    run_sql_file("0011_detection_parameters_once.sql")
 
 
 def downgrade() -> None:
