@@ -519,7 +519,7 @@ def render(results: dict, meta: dict) -> str:
         f"recorded 30 h later, after the first scan): ZeroEntry kept **{e1['late']['zeroentry_kept_for_review']}** for "
         f"human review (`EVIDENCE_RECEIVED`) with **{e1['late']['zeroentry_invoices_still_held']}** of their invoices "
         f"still held; the naive query silently dropped **{e1['late']['naive_silently_cleared']}** from its list and "
-        "holds nothing.",
+        "has no hold mechanism.",
         "",
         "## E2 Enforcement (one invalid write per rule, any client)",
         "",
