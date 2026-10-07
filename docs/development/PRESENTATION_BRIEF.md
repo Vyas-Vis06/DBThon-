@@ -38,7 +38,9 @@ complete executable law, independently authenticated instruments or owner-resist
 
 ## Measurable validation
 
-The [evaluation results](../evaluation/RESULTS.md) report synthetic evidence-gap precision/recall, query latency and persisted
+The main [M6 results](../EVALUATION_RESULTS.md) cover ten labeled complaint categories, all 18 invalid-write probes,
+late-evidence invoice holds and indexed/materialized comparisons. The supplementary
+[evaluation results](../evaluation/RESULTS.md) report synthetic evidence-gap precision/recall, query latency and persisted
 scan cost at 1k/10k/100k complaints. Raw samples, exact baseline SQL, data categories, source hashes and EXPLAIN plans are
 in [results.json](../evaluation/results.json). The baseline deliberately omits grace, exemptions and outcome receipt time.
 It answers a simpler question, so query timing does not establish equal-task speedup. Synthetic labels establish behavior

@@ -58,8 +58,8 @@ view's semantics and differ only by the materialization change.
 ## Results
 
 Use the per-class, per-rule, size and plan tables in [EVALUATION_RESULTS.md](EVALUATION_RESULTS.md) together with their run
-metadata. The M6 historical run predates the safety, temporal-evidence and policy-provenance migrations; use measurements only
-when the recorded commit and schema match the release being described. Results are workload-specific: the more complete
+metadata. The generated M6 results now include migrations 0012–0014 and the measured late-evidence invoice holds.
+Use measurements only when the recorded commit and schema match the release being described. Results are workload-specific: the more complete
 temporal and applicability checks may cost more than a simpler anti-join. The M6 optimization materializes the one-row
 parameter CTE in the final SE1/SE2 views; the comparison should hold temporal view semantics fixed and quantify only that
 query-plan change.
