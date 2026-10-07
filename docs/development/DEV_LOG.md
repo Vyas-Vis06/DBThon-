@@ -38,6 +38,21 @@ and no TRL statement.
 `python scripts/evaluate.py` (full run, default sizes): completed, results in `docs/EVALUATION_RESULTS.md`.
 
 ### Known issues
+* **Open PR #1 (`feat/audit-hardening-and-evaluation`, branched from `e863269`) now conflicts with `main`.** It was written
+  in parallel with this entry. Whoever merges it must:
+  1. **Renumber its migrations** `0011_safety_lifecycle`, `0012_temporal_evidence_invoice_serialization`,
+     `0013_policy_provenance` to `0012`-`0014` (files and `revision`/`down_revision` in `database/migrations/versions/`):
+     `main` already has `0011_detection_parameters_once`, and applied migrations are never renumbered.
+  2. **Keep `WITH g AS MATERIALIZED`** in its re-creation of `v_shadow_se1` (its `0012`): the PR copies 0007's inlined CTE,
+     which would silently undo `0011`'s fix. `test_detection_reads_the_grace_parameter_once_per_statement_not_once_per_row`
+     fails if it is lost.
+  3. **Two `scripts/evaluate.py`** (add/add conflict): the PR's measures SE1 as `ze_app` and writes `docs/evaluation/`; this
+     one runs E1-E3 including enforcement and writes `docs/EVALUATION_RESULTS.md`. Suggested: rename the PR's to
+     `scripts/evaluate_se1.py`, link its results from `docs/EVALUATION.md`, and rerun both after the merge.
+  4. Union the overlapping docs (README, ROADMAP, DEV_LOG, ARCHITECTURE, DATABASE_DESIGN, TESTING, ACCEPTANCE_CHECKLIST,
+     DEMO_SCRIPT), regenerate `docs/SCHEMA_REFERENCE.md`, and run the whole suite: `tests/db/test_evaluation.py` builds rows with
+     `tests/factories.py`, which the PR changes, and its stricter rules may change which SQLSTATE a probe gets (the test only
+     requires class `ZE`).
 * Timings come from one Windows laptop; counts are machine-independent. Rerun `python scripts/evaluate.py` (about 10 minutes)
   before quoting numbers from a different commit.
 * E4 (concurrency) is cited from the earlier session and `tests/db/test_concurrency.py`, not re-run without `0010`.
@@ -45,8 +60,9 @@ and no TRL statement.
 * The user's local `.pgdata` database has not been migrated by this session; `python scripts/dev.py` applies `0011` on its next start.
 
 ### Next step
-M6-05, then the backlog (automated browser tests first). For slides or a report, start from `docs/SUBMISSION.md` and quote
-numbers only from `docs/EVALUATION_RESULTS.md`.
+Merge PR #1 following the four points above (it is the larger body of work and touches the same files). Then M6-05 and the
+backlog (automated browser tests first). For slides or a report, start from `docs/SUBMISSION.md` and quote numbers only from
+`docs/EVALUATION_RESULTS.md`.
 
 ---
 
