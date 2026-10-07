@@ -84,7 +84,7 @@ point at an existing development or production cluster. Serial execution avoids 
 
 ## Comparative evaluation
 
-`scripts/evaluate.py` always creates and cleans its own embedded cluster. It runs labeled 1k/10k/100k synthetic complaint
+`scripts/evaluate_temporal.py` always creates and cleans its own embedded cluster. It runs labeled 1k/10k/100k synthetic complaint
 sets through an untimed existence-only baseline and the actual SE1 query as `ze_app` with ENGINEER context. The output
 includes confusion matrices, each latency sample, warm-up/repetition methodology and EXPLAIN (ANALYZE, BUFFERS) plans.
 Historical outcome receipts are imported by a narrowly disabled owner-only timestamp trigger. The late-finalization class

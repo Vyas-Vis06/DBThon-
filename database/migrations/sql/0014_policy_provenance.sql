@@ -1,4 +1,4 @@
--- 0013_policy_provenance.sql
+-- 0014_policy_provenance.sql
 -- Add source classification and append-only policy/authorization snapshots.
 -- This is provenance for the configured product gate, not a compiler or certification of law.
 
@@ -274,7 +274,7 @@ INSERT INTO rule_parameter_history
    effective_at, actor_user_id, change_reason)
 SELECT param_key, revision, value, unit, description, legal_ref, is_assumption, source_code,
        clock_timestamp(), NULL,
-       'Initial provenance baseline at migration 0013; prior revision history was unavailable'
+       'Initial provenance baseline at migration 0014; prior revision history was unavailable'
   FROM rule_parameter;
 
 CREATE FUNCTION immutable_policy_record() RETURNS trigger

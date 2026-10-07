@@ -12,7 +12,7 @@ applicability of those checks visible; they do not compile legal text into execu
 each citation as `LAW`, `COURT_DIRECTION`, `GUIDANCE` or `PRODUCT_POLICY`. Each entry-gate clause can link to multiple
 sources where the SQL combines a statutory duty, operational guidance and a stricter product control.
 
-The initial source history is a cutover baseline created by migration 0013. It records the values present at that
+The initial source history is a cutover baseline created by migration 0014. It records the values present at that
 migration and states that earlier value/reason history was unavailable. Later changes to an active parameter append a
 revision with its source code, version, server effective time, actor and required reason. The current row remains the
 input to new gate checks. The history is not a retroactive law engine and this release does not promise replay of a

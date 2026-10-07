@@ -1,7 +1,7 @@
-"""temporal evidence and invoice hold serialization
+"""safety lifecycle
 
-Revision ID: 0012
-Revises: 0011
+Revision ID: 0011
+Revises: 0010
 """
 from zeroentry.migrate import run_sql_file
 
@@ -12,7 +12,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    run_sql_file("0012_temporal_evidence_invoice_serialization.sql")
+    run_sql_file("0012_safety_lifecycle.sql")
 
 
 def downgrade() -> None:

@@ -40,7 +40,7 @@ validates input shapes, and turns database refusals into readable HTTP errors.
 
 | Component | Path | Responsibility |
 |---|---|---|
-| Schema and rules | `database/migrations/sql/0001-0013` | tables, constraints, triggers, functions, procedure, views, privileges, RLS (forward-only migrations run by Alembic) |
+| Schema and rules | `database/migrations/sql/0001-0014` | tables, constraints, triggers, functions, procedure, views, privileges, RLS (forward-only migrations run by Alembic) |
 | Reference data | migration `0003` | roles, legal clauses, rule parameters, resolution types, detection rules, gear catalogue |
 | Demo data | `database/seeds/`, `src/zeroentry/seed.py` | deterministic scenarios S0-S10 and demo logins (development only) |
 | Configuration | `config.py`, `.env` | validated settings; production refuses insecure values |

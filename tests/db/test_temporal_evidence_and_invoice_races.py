@@ -244,7 +244,7 @@ def test_migration_backfills_audited_finalization_and_leaves_unverifiable_legacy
         with cluster.connect(database) as conn:
             conn.execute("CREATE TABLE alembic_version (version_num varchar(32) PRIMARY KEY NOT NULL)")
             sql_dir = ROOT / "database" / "migrations" / "sql"
-            # A pre-0012 database has only the numbered migration SQL available at this point.
+            # A pre-0013 database has only the numbered migration SQL available at this point.
             for migration in sorted(sql_dir.glob("00*.sql")):
                 if int(migration.name[:4]) <= 11:
                     conn.execute(migration.read_text(encoding="utf-8"))
@@ -275,7 +275,7 @@ def test_migration_backfills_audited_finalization_and_leaves_unverifiable_legacy
             unverifiable_id = unverifiable.fetchone()["deploy_id"]
             conn.execute("ALTER TABLE machine_deployment ENABLE TRIGGER trg_audit")
 
-            conn.execute((sql_dir / "0012_temporal_evidence_invoice_serialization.sql").read_text(encoding="utf-8"))
+            conn.execute((sql_dir / "0013_temporal_evidence_invoice_serialization.sql").read_text(encoding="utf-8"))
             rows = conn.execute("SELECT deploy_id, recorded_at, outcome_recorded_at FROM machine_deployment "
                                 "WHERE deploy_id = ANY(%s) ORDER BY deploy_id",
                                 ([transitioned, unverifiable_id],)).fetchall()

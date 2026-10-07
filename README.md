@@ -92,7 +92,7 @@ CI runs the suite on Linux/Windows (Python 3.11/3.12), macOS (3.12), and a dispo
 ## Evaluation and presentation
 
 ```bash
-python scripts/evaluate.py --sizes 1000 10000 100000 --repeats 7
+python scripts/evaluate_temporal.py --sizes 1000 10000 100000 --repeats 7
 ```
 
 The [measured results](docs/evaluation/RESULTS.md) include synthetic precision/recall, query latency, persisted scan cost

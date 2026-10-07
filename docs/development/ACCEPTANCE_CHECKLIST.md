@@ -44,7 +44,7 @@ was run; `[~]` = done with a stated limit. Last full pass: 2026-10-07 (see [DEV_
 |---|---|---|
 | [x] | Runs from a fresh clone | fresh clone + fresh venv + install + full suite, 2026-10-07; CI on Linux, Windows and macOS |
 | [x] | Tests at several levels | unit, database, API ([TESTING.md](../TESTING.md)) |
-| [x] | Migrations and seed data | `database/migrations/` (13, forward-only); `database/seeds/` (deterministic, idempotent; `tests/db/test_seed.py`) |
+| [x] | Migrations and seed data | `database/migrations/` (14, forward-only); `database/seeds/` (deterministic, idempotent; `tests/db/test_seed.py`) |
 | [x] | No secrets in the repository | `.env.example` placeholders only; dev secrets generated into git-ignored `.pgdata/` |
 | [x] | Documentation set | README, PROJECT_SPEC, ROADMAP, AGENTS, CLAUDE, CONTRIBUTING, SECURITY, docs/ (ARCHITECTURE, DATABASE_DESIGN, ER_DIAGRAM, SCHEMA_REFERENCE, API_SPEC, SETUP, TESTING, decisions, development); links checked by `tests/unit/test_docs.py` |
 | [~] | Real PostgreSQL server | `scripts/db.py bootstrap`/`reset` tested against PostgreSQL 16 (embedded); the Docker command in SETUP was not run here |

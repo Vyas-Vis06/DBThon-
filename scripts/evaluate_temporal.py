@@ -1,6 +1,6 @@
 """Reproducible synthetic accuracy/scale evaluation. Never connects to an existing database.
 
-    python scripts/evaluate.py --sizes 1000 10000 100000 --repeats 7
+    python scripts/evaluate_temporal.py --sizes 1000 10000 100000 --repeats 7
 
 Creates its own embedded PostgreSQL, applies real migrations, imports labeled historical
 fixtures, measures as ze_app/ENGINEER, writes raw results/plans and cleans up the cluster.
@@ -167,7 +167,7 @@ def markdown(report):
                      f"{z['p50_ms']:.2f} / {z['p95_ms']:.2f} | {s['first_ms']:.2f} / {s['repeat_ms']:.2f} |")
     lines += ["", "Raw confusion matrices, per-category results, each sample, row counts and EXPLAIN plans "
               "are in results.json. Reproduce from a Python 3.11/3.12 source checkout:", "",
-              "```sh", "python scripts/evaluate.py --sizes 1000 10000 100000 --repeats 7", "```", "",
+              "```sh", "python scripts/evaluate_temporal.py --sizes 1000 10000 100000 --repeats 7", "```", "",
               "SE2 division, concurrency and authorization correctness are covered separately by the real-PG regression suite. "
               "This experiment evaluates SE1 only; it does not benchmark an incremental cache or authenticated instruments.", ""]
     return "\n".join(lines)

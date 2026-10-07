@@ -13,7 +13,7 @@ All data is synthetic. Six evenly interleaved categories: timely, missing, exemp
 Raw confusion matrices, per-category results, each sample, row counts and EXPLAIN plans are in results.json. Reproduce from a Python 3.11/3.12 source checkout:
 
 ```sh
-python scripts/evaluate.py --sizes 1000 10000 100000 --repeats 7
+python scripts/evaluate_temporal.py --sizes 1000 10000 100000 --repeats 7
 ```
 
 SE2 division, concurrency and authorization correctness are covered separately by the real-PG regression suite. This experiment evaluates SE1 only; it does not benchmark an incremental cache or authenticated instruments.

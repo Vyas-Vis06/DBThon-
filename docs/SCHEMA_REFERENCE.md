@@ -4,7 +4,7 @@
 > fails when this file is out of date. The reasoning behind the design is in [DATABASE_DESIGN.md](DATABASE_DESIGN.md) and the
 > diagrams are in [ER_DIAGRAM.md](ER_DIAGRAM.md).
 
-Schema revision: `0013` · PostgreSQL 16 · 35 application tables.
+Schema revision: `0014` · PostgreSQL 16 · 35 application tables.
 
 How to read it: *a foreign key with no `ON DELETE` clause is `NO ACTION`: deleting the referenced row is refused while
 dependants exist.* Check, unique and exclusion constraints are shown exactly as PostgreSQL stores them. Row-level security

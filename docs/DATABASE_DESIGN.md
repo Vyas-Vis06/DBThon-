@@ -212,7 +212,7 @@ rows; the user is passed per transaction with `set_config(..., true)`. Details a
   (`python scripts/db.py new <name>` scaffolds the next). Reference data (roles, clauses, rules, parameters, gear) ships in
   migration `0003`; demo data is separate (`database/seeds/`).
 
-## Audit hardening (0011–0013)
+## Audit hardening (0012–0014)
 
 `permit_safety_event` retains immutable stop, overstay and exit-violation evidence. Its optional `entry_id` FK is deferred
 so an event created in the entry transaction still requires the physical log row at commit. Crew/gear parent IDs are

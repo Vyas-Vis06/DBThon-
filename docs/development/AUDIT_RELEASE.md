@@ -4,7 +4,7 @@ The audited foundation was commit `e8632699e85c4167940194649444d45ff5537621`. It
 database design: mechanisation-first jobs, written waivers, a database entry gate, crew/gear division, gas checks,
 entry intervals, atomic incident consequences, SE1/SE2 evidence-gap detection, source-linked invoice holds,
 authentication, RBAC, RLS and a working UI. Its original 509-test suite passed locally. This release extends that
-foundation through migrations 0011–0013; migrations 0001–0010 are unchanged.
+foundation through migrations 0012–0014; migrations 0001–0010 are unchanged.
 
 ## Audit findings and implemented corrections
 
@@ -58,5 +58,5 @@ claims of database safety are established prior art.
 The presentation prototype is not a production safety certification. The next work is a domain/legal pilot review,
 task-specific equipment applicability, ULB scope, independently authenticated physical instruments, field alert
 validation, external artifact signing/retention, notifications, production operations and automated browser coverage.
-The new revision history starts at migration 0013 and is not a retroactive rule-replay engine. These items are tracked
+The new revision history starts at migration 0014 and is not a retroactive rule-replay engine. These items are tracked
 in [ROADMAP.md](../../ROADMAP.md).

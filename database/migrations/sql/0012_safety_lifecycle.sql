@@ -1,4 +1,4 @@
--- 0011_safety_lifecycle.sql
+-- 0012_safety_lifecycle.sql
 -- Continuing authorization, truthful exit capture, immutable safety events, and Rule 6(3)(k) rest.
 
 -- Rule 6(3)(k)(ii) requires a mandatory 30-minute interval between 90-minute stretches. This is a

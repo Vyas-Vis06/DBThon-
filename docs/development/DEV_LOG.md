@@ -15,12 +15,12 @@ current result. The release is for review, not an automatic merge or a productio
 ### Implemented and verified
 
 * Immutable crew/gear parents; live revalidation; time-based maintenance; rest interval; truthful exits after stop and
-  durable violation history (`0011`). Private locking/event helpers have runtime execution revoked.
+  durable violation history (`0012`). Private locking/event helpers have runtime execution revoked.
 * Final-outcome receipt semantics and audited legacy backfill; common complaint/invoice serialization for alert and
-  incident holds versus payment, approval and invoice creation (`0012`). Financial writers require `READ COMMITTED`;
+  incident holds versus payment, approval and invoice creation (`0013`). Financial writers require `READ COMMITTED`;
   repeatable-read snapshots fail with retryable `40001` rather than accept stale decisions.
 * Classified primary sources, reasoned policy revisions and immutable successful authorization snapshots with
-  PostgreSQL SHA-256 (`0013`). Runtime actors/receipts are DB-owned; authorization samples a fresh clock after locks.
+  PostgreSQL SHA-256 (`0014`). Runtime actors/receipts are DB-owned; authorization samples a fresh clock after locks.
 * Automatic safety/detection tasks commit separately with bounded waits and advisory locks. Failure injection confirms
   that a failed scan cannot roll back an already committed stop.
 * Built and separately installed wheel passes shell/JS/CSS smoke checks. No new application dependency added.
