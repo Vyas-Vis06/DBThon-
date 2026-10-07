@@ -10,7 +10,7 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 35 tables, new scoped read endpoints and presentation screens. Original migrations 0001–0011 remain unchanged.
 Initial audit version, before the concurrent M6 integration: **568 passed in 30.21 seconds**, macOS, Python 3.12.11,
 embedded PostgreSQL 16.2. All six CI jobs passed on `28b8bee`, including PostgreSQL service and all five OS/Python jobs.
-Final integrated local validation: **574 passed in 30.70 seconds**, including upstream late-evidence invoice measurement.
+Final integrated local validation: **574 passed in 29.67 seconds**, including upstream late-evidence invoice measurement.
 Branch CI is configured for the original five OS/Python jobs and a separate PostgreSQL 16 service; see Actions for its
 current result. The release is for review, not an automatic merge or a production safety certification.
 

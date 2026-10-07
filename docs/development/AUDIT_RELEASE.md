@@ -29,7 +29,7 @@ See [POLICY_AND_PRIOR_ART.md](../POLICY_AND_PRIOR_ART.md) for the primary-source
 
 ## Validation of the integrated release
 
-The final local full suite passed **574 tests in 30.70 seconds** on Python 3.12.11 and embedded PostgreSQL 16.2.
+The final local full suite passed **574 tests in 29.67 seconds** on Python 3.12.11 and embedded PostgreSQL 16.2.
 All original migrations 0001–0011 match upstream byte-for-byte. Main M6 and the temporal evaluator were rerun against
 committed integrated code; the generated reports identify their source commits and workloads. M6 confirms 20/20
 late-evidence invoices stay held, and 18/18 listed invalid writes are refused. Temporal raw source fingerprints match

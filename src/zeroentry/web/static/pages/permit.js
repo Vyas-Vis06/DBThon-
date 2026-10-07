@@ -41,7 +41,7 @@ export default async function (root, { params }) {
     return h('div', { class: 'row' },
       h('button', { type: 'button', onclick: recheck }, 'Re-check the clauses'),
       h('button', { type: 'button', class: 'primary', onclick: authorise }, 'Ask the database to authorise entry'),
-      h('span', { class: 'small muted' }, 'Gas readings go stale after 15 minutes; re-check before asking.'));
+      h('span', { class: 'small muted' }, 'Gas readings have a configured freshness limit; re-check before asking.'));
   }
 
   async function recheck() {
@@ -124,7 +124,7 @@ export default async function (root, { params }) {
   };
 
   const gasTab = async (box) => {
-    box.append(h('p', { class: 'muted' }, 'For each depth the LATEST reading governs: at most 15 minutes old, from a detector calibrated that day, O₂ 19.5–21 %, H₂S and combustibles below their limits. Readings cannot be edited or deleted.'),
+    box.append(h('p', { class: 'muted' }, 'For each depth the LATEST reading governs. It must be fresh, within the configured gas limits and from a detector calibrated that day. Readings cannot be edited or deleted.'),
       table([['Taken (IST)', (r) => [fmtDT(r.taken_at), ' ', h('span', { class: 'small muted' }, ago(r.taken_at))]], ['Depth', (r) => badge(r.depth_level, 'info')],
         ['O₂ %', (r) => r.o2_pct], ['H₂S ppm', (r) => r.h2s_ppm], ['LEL %', (r) => r.lel_pct], ['CO ppm', (r) => r.co_ppm], ['Detector', (r) => r.detector_serial],
         ['Signed off by', (r) => r.recorded_by_name]], d.readings, 'No readings logged yet.'));
