@@ -46,8 +46,8 @@ def build_permit(api, world, *, standby=True, full_gear=True, bottom_age_min=1):
 def widen_daylight(api):
     """Law is data: so a demo or test outside 06:00-18:00 IST widens the window through the audited admin API."""
     admin = api("admin")
-    ok(admin.patch(f"{API}/rules/daylight_start_hour", json={"value": 0}))
-    ok(admin.patch(f"{API}/rules/daylight_end_hour", json={"value": 24}))
+    ok(admin.patch(f"{API}/rules/daylight_start_hour", json={"value": 0, "reason": "Synthetic test policy adjustment"}))
+    ok(admin.patch(f"{API}/rules/daylight_end_hour", json={"value": 24, "reason": "Synthetic test policy adjustment"}))
 
 
 # --- the demo ---------------------------------------------------------------------------------------------------
@@ -112,35 +112,58 @@ def test_machine_fails_then_waiver_then_denied_with_reasons_then_authorised(api,
     assert dossier["job"]["contractor_name"] and dossier["complaint"]["manhole_code"] and dossier["waiver"]["reason_code"] == "MACHINE_FAILED"
 
 
-def test_entries_obey_the_ninety_minute_rule_overlap_and_closing(api, world):
+def test_entries_use_current_admission_and_exits_remain_recordable(api, world, conn):
     sup, eng = api("supervisor"), api("engineer")
     widen_daylight(api)
     complaint, job, permit = build_permit(api, world)
     pid, w = permit["permit_id"], world["workers_a"]
     assert ok(sup.post(f"{API}/permits/{pid}/authorise"))["authorised"] is True
-    start = NOW() + timedelta(minutes=1)
+    start = NOW()
 
-    refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start), "exited_at": iso(start + timedelta(minutes=95))}),
-            422, "rule_violation", "95 minutes")
+    # A client cannot backdate a new open admission to make an old authorized permit look current.
+    refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start - timedelta(hours=1))}),
+            422, "rule_violation", "server clock")
     refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[2], "entered_at": iso(start)}), 422, "rule_violation", "ENTRANT")
     entry = ok(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start)}), 201)
     assert entry["open"] is True
-    refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start + timedelta(minutes=5)),
+    refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start + timedelta(minutes=1)),
                                                            "exited_at": iso(start + timedelta(minutes=30))}), 409, "overlap")
-    other = ok(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[1], "entered_at": iso(start), "exited_at": iso(start + timedelta(minutes=45))}), 201)
-    assert other["minutes"] == 45
+    other = ok(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[1], "entered_at": iso(start),
+                                                            "exited_at": iso(NOW() + timedelta(minutes=2))}), 201)
+    assert other["minutes"] >= 1 and other["exit_recorded_at"] is not None
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'EXIT_TIME_AHEAD_OF_RECEIPT'",
+                        (other["entry_id"],)).fetchone()["n"] == 1
 
     refused(sup.post(f"{API}/permits/{pid}/close"), 409, "invalid_state", "still inside")
-    refused(sup.post(f"{API}/permits/{pid}/entries/{entry['entry_id']}/exit", json={"exited_at": iso(start + timedelta(minutes=100))}),
-            422, "rule_violation", "exceeds")
-    done = ok(sup.post(f"{API}/permits/{pid}/entries/{entry['entry_id']}/exit", json={"exited_at": iso(start + timedelta(minutes=60))}))
-    assert done["minutes"] == 60 and done["open"] is False
+    refused(sup.post(f"{API}/permits/{pid}/entries/{entry['entry_id']}/exit", json={"exited_at": iso(NOW() + timedelta(minutes=15))}),
+            422, "rule_violation", "five minutes ahead")
+    done = ok(sup.post(f"{API}/permits/{pid}/entries/{entry['entry_id']}/exit", json={"exited_at": iso(NOW() + timedelta(minutes=2))}))
+    assert done["minutes"] >= 1 and done["open"] is False and done["exit_recorded_at"] is not None
     assert ok(sup.post(f"{API}/permits/{pid}/close"))["status"] == "CLOSED"
     refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[1], "entered_at": iso(start + timedelta(minutes=90))}), 409, "invalid_state")
 
     # the closed, logged permit is lawful clearance evidence: resolving the complaint raises no warning
     resolved = ok(eng.post(f"{API}/complaints/{complaint['complaint_id']}/resolve", json={"resolution_code": "CLEARED"}))
     assert resolved["status"] == "RESOLVED" and resolved["evidence_on_file"] is True and resolved["warning"] is None
+
+
+def test_exit_can_be_logged_after_permit_abort_without_rewriting_the_stop_reason(api, world, conn):
+    sup = api("supervisor")
+    widen_daylight(api)
+    _, _, permit = build_permit(api, world)
+    pid, worker = permit["permit_id"], world["workers_a"][0]
+    ok(sup.post(f"{API}/permits/{pid}/authorise"))
+    entered = ok(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": worker, "entered_at": iso(NOW())}), 201)
+    ok(sup.post(f"{API}/permits/{pid}/abort", json={"reason": "Gas alarm: stop work now"}))
+    exited = ok(sup.post(f"{API}/permits/{pid}/entries/{entered['entry_id']}/exit",
+                         json={"exited_at": iso(NOW() + timedelta(minutes=2))}))
+    assert exited["open"] is False and exited["exit_recorded_at"] is not None
+    status = ok(sup.get(f"{API}/permits/{pid}"))["permit"]["status"]
+    assert status == "ABORTED"
+    reason = conn.execute("SELECT end_reason FROM entry_permit WHERE permit_id = %s", (pid,)).fetchone()["end_reason"]
+    assert reason == "Gas alarm: stop work now"
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'EXIT_AFTER_PERMIT_STOP'",
+                        (entered["entry_id"],)).fetchone()["n"] == 1
 
 
 def test_daylight_is_law_as_data_the_default_window_refuses_night_entry(api, world, conn):
@@ -157,7 +180,7 @@ def test_daylight_is_law_as_data_the_default_window_refuses_night_entry(api, wor
     else:
         refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(t + timedelta(minutes=1))}),
                 422, "rule_violation", "daylight")
-    ok(api("admin").patch(f"{API}/rules/daylight_end_hour", json={"value": 24}))
+    ok(api("admin").patch(f"{API}/rules/daylight_end_hour", json={"value": 24, "reason": "Synthetic test policy adjustment"}))
     audit = ok(api("auditor").get(f"{API}/audit-log?table_name=rule_parameter"))
     assert audit["items"][0]["new_data"]["param_key"] == "daylight_end_hour" and audit["items"][0]["actor_user_id"] == world["users"]["admin"]["id"]
     assert night.hour == 23

@@ -55,6 +55,10 @@ MATRIX = [
     ("GET", "/reports/shadow-summary", ANALYSTS), ("GET", "/reports/permit-readiness", STAFF),
     ("GET", "/admin/users", {"admin"}), ("POST", "/admin/users", {"admin"}), ("PATCH", f"/admin/users/{X}", {"admin"}),
     ("GET", "/rules", EVERYONE_SIGNED_IN), ("PATCH", "/rules/NOPE", {"admin"}),
+    ("GET", "/policy-sources", EVERYONE_SIGNED_IN), ("GET", "/rules/NOPE/history", EVERYONE_SIGNED_IN),
+    ("POST", "/maintenance/sweep", MUNICIPAL),
+    ("GET", f"/permits/{X}/decision", EVERYONE_SIGNED_IN),
+    ("GET", f"/permits/{X}/safety-events", EVERYONE_SIGNED_IN),
     ("GET", "/audit-log", {"admin", "auditor"}),
     ("GET", "/auth/me", EVERYONE_SIGNED_IN),
 ]

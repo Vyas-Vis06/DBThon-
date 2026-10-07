@@ -57,9 +57,10 @@ quoted in a presentation**): 1,248 deaths since 1993 with Tamil Nadu highest at 
 government-commissioned social audit finding no safety equipment in 49 of 54 deaths; and the Supreme Court's
 *Balram Singh v. Union of India* (2023) directions of ₹30 lakh compensation per death.
 
-The rules exist but nothing enforces them at the moment of entry: gas tests are optional in practice, gear is
-"available" but not issued to the person going down, permission is verbal, and deaths are recorded after the fact.
-Existing tools (worker registries, desludging apps, industrial permit-to-work) never *refuse* an entry.
+The project addresses the gap between recorded safeguards and an individual job decision. Digital permit systems already
+support entry gates and competency/gas controls. ZeroEntry studies a municipal integration of database-owned permits,
+time-aware evidence gaps, human review and source-linked financial holds. The comparison and verified source mapping are
+in [POLICY_AND_PRIOR_ART.md](docs/POLICY_AND_PRIOR_ART.md). Missing evidence supports a reviewable suspicion.
 
 ## 3. Stakeholders and roles
 
@@ -87,8 +88,8 @@ Roles are enforced on the server (API guards) and, for row scoping, by PostgreSQ
 
 ## 5. Business rules
 
-Legal bases are quoted **as the proposal states them**. The proposal itself warns that rule-level numbering of the
-2013 Rules must be checked against the Gazette; this project deliberately cites rules by name, not number.
+Sources are classified as law, court direction, guidance or product policy in `policy_source`. Applicability notes explain
+where the configured gate is stricter or illustrative. The implementation does not certify the complete legal/field process.
 
 ### Entry gate (zero-entry)
 
@@ -99,11 +100,12 @@ Legal bases are quoted **as the proposal states them**. The proposal itself warn
 | BR-03 | Crew ≥ 3 persons with ≥ 1 supervisor, ≥ 1 standby (top man) and ≥ 1 entrant. A worker holds exactly one role per permit, so a standby can never also be an entrant. | 2013 Rules; ERSU book | clause check; PK `(permit_id, worker_id)` |
 | BR-04 | Every crew member is medically fit and trained on the authorisation date. | Proposal §6.2 | clause `CREW_FIT` |
 | BR-05 | The job's contractor is `ACTIVE` with an unexpired licence. | *Balram Singh* 2023 | clause + job trigger |
-| BR-06 | Every entrant holds **every** statutory gear item (relational division). The check fails if no statutory item is defined (no vacuous pass). | 2013 Rules, protective-gear schedule | clause `GEAR_ALL` |
+| BR-06 | Every entrant holds every item marked `statutory` in the configured illustrative catalogue (relational division). The check fails if the required set is empty. | Product applicability policy informed by 2013 Rules r.4; the legal schedule also includes shared site equipment | clause `GEAR_ALL` |
 | BR-07 | For each depth `TOP`, `MID`, `BOTTOM` the **latest** reading is ≤ 15 min old at authorisation, from a detector calibrated on the day it was taken, with O₂ 19.5-21.0 %, H₂S < 10 ppm, LEL < 10 %, CO below its limit. | 2013 Rules; CPHEEO SOP 2018; ERSU 2019 | clauses `GAS_TOP/MID/BOTTOM` |
 | BR-08 | **Default deny:** status `AUTHORISED` is reachable only if every clause passes, for *every* client, including a raw `UPDATE`. | Core claim | `permit_clause_check()` called from `authorise_entry()` and a BEFORE UPDATE trigger |
-| BR-09 | Crew and gear are frozen once authorised; gas readings are append-only. | Integrity | triggers |
-| BR-10 | Entries only inside the permit's validity window, only by an `ENTRANT`, only in daylight, at most 90 minutes each, never overlapping for the same worker. | 2013 Rules / ERSU | trigger + exclusion constraint |
+| BR-09 | Crew and gear are frozen once authorised and their parent IDs cannot be reassigned; gas readings are append-only. | Integrity | triggers |
+| BR-10 | Admit new entries only with a current passing gate, valid window, entrant role, daylight, non-overlap and required 30-minute rest after a 90-minute stretch. Preserve truthful exits after stop/expiry and record overruns as immutable safety events. | 2013 Rules r.6(3)(k); fixed daylight hours are product policy | trigger + exclusion constraint + safety events |
+| BR-13 | A newer unsafe gas reading or credential/detector/contractor revocation stops affected permits. A periodic current-time sweep handles stale readings, permit expiry and overstays. Recovery needs a fresh permit. | Continuing product authorization over stored records | dependency triggers, `sweep_permit_safety()` and durable `permit_safety_event` |
 | BR-11 | Permit states: `DRAFT → AUTHORISED → CLOSED`; `DRAFT → CANCELLED`; `AUTHORISED → ABORTED`. `CLOSED` needs no open entries. Terminal states are final. | Integrity | state-machine trigger |
 | BR-12 | Calibration: a reading from a detector whose calibration had lapsed on the reading's date is rejected. | ERSU / good practice | trigger |
 
@@ -121,7 +123,7 @@ Legal bases are quoted **as the proposal states them**. The proposal itself warn
 | ID | Rule |
 |---|---|
 | BR-30 | Expected population, rule **SE1**: complaints `RESOLVED` with a resolution type that requires evidence (`CLEARED`). Evidence is either (a) a machine deployment with outcome `CLEARED`, or (b) an `AUTHORISED→CLOSED` permit with at least one logged entry, on any job of that complaint. No evidence, or no job at all, is a candidate. |
-| BR-31 | **Late evidence never auto-closes an alert.** Evidence counts only if it was *recorded* within the grace window after resolution (default 24 h). Evidence that arrives later moves an existing alert to `EVIDENCE_RECEIVED`, and a human decides (`CONFIRMED` or `DISMISSED`, with a written note). |
+| BR-31 | **Late evidence never auto-closes an alert.** Machine evidence uses its immutable server-assigned final-outcome receipt, separately from deployment insertion/event time. Evidence after the grace deadline remains late even before the first scan, and leads to `EVIDENCE_RECEIVED` for human review. Legacy outcomes without a trustworthy audit event require review. |
 | BR-32 | Rule **SE2**: for each `CLOSED` permit, every `ENTRANT` should have at least one entry-log row recorded within the grace window. Entrants without one make the complaint a candidate. |
 | BR-33 | Complaints resolved as `NO_BLOCKAGE_FOUND`, `DUPLICATE_COMPLAINT`, `REFERRED_OUT` or `WITHDRAWN` are *intentionally absent*: not expected to have evidence, never flagged. |
 | BR-34 | One alert per `(complaint, rule)`; re-running the scan is idempotent. A dismissed alert is not re-opened by the scan. |
@@ -135,6 +137,7 @@ Legal bases are quoted **as the proposal states them**. The proposal itself warn
 | BR-40 | Thresholds, limits, amounts and grace periods are rows in `rule_parameter` with a legal reference; changing one is audited. |
 | BR-41 | `audit_log` is append-only (trigger; privileges revoked from the application role). |
 | BR-42 | The application connects as a least-privilege role; contractors and workers see only their own rows (RLS). |
+| BR-43 | Parameter edits append a source-classified revision with actor, receipt time and a written reason. Successful authorization stores an immutable JSONB snapshot of clauses, evidence and policy revisions, with a DB-computed SHA-256 digest. This preserves the recorded explanation rather than proving physical truth or resisting a database owner. |
 
 ## 6. Assumptions (explicit, configurable, to be confirmed)
 
@@ -145,21 +148,23 @@ Marked `is_assumption = true` in `rule_parameter` and shown as such in the admin
 | A-01 | CO limit 35 ppm. | The 4-gas monitor records CO but the proposal gives no limit (NIOSH REL used as a placeholder). |
 | A-02 | Permit validity 240 minutes. | The sources give no permit duration. |
 | A-03 | Daylight is 06:00-18:00 IST. | "Daylight only" has no fixed hours; sunrise/sunset vary. |
-| A-04 | No mandatory rest interval is modelled. | "Then rest" has no stated length; adding a made-up number would be false precision. |
-| A-05 | Compensation due 30 days after the incident; disability amount ₹20 lakh (upper end of the ₹10-20 lakh range). | Deadline and slab are not specified in the proposal. |
+| A-04 | Superseded: 30 minutes of rest after a 90-minute stretch is now modelled. | The 2013 Rules r.6(3)(k)(ii) supply the interval; the previous claim that it was unstated was incorrect. |
+| A-05 | Compensation due 30 days after the incident; fixed disability selection ₹20 lakh. | Product defaults. Balram Singh ¶96(5) requires severity-sensitive minimums (₹10 lakh, or ₹20 lakh when permanently economically helpless), with no stated universal ceiling. |
 | A-06 | Grace window 24 h for evidence to be recorded after resolution. | Field records sync late; an assumption trades false positives against delay. |
 | A-07 | All ULBs are in India Standard Time (fixed +05:30). | True for the target; keeps the schema free of a tz database. |
 | A-08 | Suspension (not blacklisting) for disability incidents. | The proposal covers death only. |
 | A-09 | The gear catalogue in the seed data is illustrative. | The 2013 Rules' schedule must be checked against the Gazette. |
 | A-10 | Contractor risk score = 10 × deaths + 5 × disabilities + 3 × confirmed shadow entries + 1 × open alerts + 2 × overdue compensation cases (`v_contractor_risk`). | A ranking aid for reviewers, not a legal measure; the weights are illustrative and not in `rule_parameter`. |
+| A-11 | Open-entry start reports must be within five minutes of the server clock. Exit reports more than five minutes ahead are refused; a smaller lead is recorded with violation evidence. | A fixed product clock-tolerance choice, not a statutory limit. Server receipt is separate from the reported event time. |
 
 ## 7. Limitations and edge cases
 
 * The database enforces *state*, not physics: a typed gas value may be false. Mitigations: detector serial and
   calibration binding, signed-in recorder, append-only readings and audit log, invoice holds as a payment incentive.
-* A 95-minute entry cannot be *recorded as a lawful entry* (the trigger rejects it); the real overrun must be reported
-  as a `NEAR_MISS` incident. This is deliberate: the log never certifies a violation as compliant.
-* Gas freshness is checked at authorisation, not continuously; field instruments must keep monitoring.
+* An entry log records reported physical times. An overrun/late exit keeps immutable violation evidence and does not certify
+  lawful work. The application must still support an operator's physical evacuation/rescue response.
+* Current gates, dependency triggers and periodic sweeps operate on stored records. Typed/simulated readings can be false,
+  and process downtime or scheduler failure delays time-only decisions. They do not replace continuous field instruments.
 * Absence evidence is only as good as the complaint system feeding it; a ULB that never records resolutions is
   invisible to SE1.
 * Deleting is restricted: evidence tables (readings, entries, waivers, incidents, audit) cannot be deleted; permits
@@ -174,8 +179,8 @@ Marked `is_assumption = true` in `rule_parameter` and shown as such in the admin
 2. **Denied, then authorised entry.** Machine `FAILED` → engineer files waiver → supervisor drafts permit with crew,
    tries to authorise → **DENIED** with the exact failing clauses (missing gear, stale `BOTTOM` reading, no standby)
    → supervisor fixes each → **AUTHORISED**.
-3. **Overrun blocked.** A worker's entry logged at 95 minutes is rejected by the trigger; an overlapping entry for the
-   same worker is rejected by the exclusion constraint.
+3. **Overrun preserved.** A worker's 95-minute exit is recorded with violation evidence. Further admission fails until the
+   required rest/current gate holds. An overlapping entry for the same worker is rejected by the exclusion constraint.
 4. **Shadow entry found.** A complaint is resolved as cleared with no machine log and no permit. After the grace window the
    scan raises an alert and holds the contractor's invoice; an engineer investigates and confirms it.
 5. **False positive and late paperwork.** A legitimate machine log is recorded two days late: the alert moves to
@@ -187,6 +192,6 @@ Marked `is_assumption = true` in `rule_parameter` and shown as such in the admin
 
 | # | Question | Provisional answer |
 |---|---|---|
-| Q1 | Exact rule numbers and the full gear schedule in the 2013 Rules | Cited by name; gear catalogue is editable data (A-09). |
+| Q1 | Full gear applicability and delegated waiver authority | Selected clauses have verified citations; the illustrative per-entrant catalogue and engineer approval still need domain review (A-09). |
 | Q2 | Should resolving a complaint without evidence be *blocked* instead of detected? | Detected: the complaint system belongs to the ULB's legacy process and ZeroEntry must see the gap, not hide it. |
 | Q3 | Per-ULB visibility for engineers and supervisors | Not implemented; see ROADMAP backlog. |

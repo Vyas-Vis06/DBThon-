@@ -27,6 +27,7 @@ def main() -> None:
     parser.add_argument("--no-seed", action="store_true")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--data-dir", type=Path, default=ROOT / ".pgdata", help="Isolated demo cluster directory")
     args = parser.parse_args()
 
     try:
@@ -46,8 +47,8 @@ def main() -> None:
     sys.path.insert(0, str(Path(__file__).parent))
     from db import alembic_config
 
-    home = ROOT / ".pgdata"
-    home.mkdir(exist_ok=True)
+    home = args.data_dir.resolve()
+    home.mkdir(parents=True, exist_ok=True)
     secrets_file = home / "dev_secrets.json"
     keep = json.loads(secrets_file.read_text()) if secrets_file.exists() else {}
     for key in ("app_db_password", "demo_password"):

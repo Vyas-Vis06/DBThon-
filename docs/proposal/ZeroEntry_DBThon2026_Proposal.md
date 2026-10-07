@@ -1,5 +1,10 @@
 # ZeroEntry: A Default-Deny Database that Enforces India's Sewer-Safety Law Before Anyone Enters a Manhole
 
+> **Archived initial proposal.** Its original novelty, legal and headline-statistic claims are superseded by the
+> [current policy/prior-art analysis](../POLICY_AND_PRIOR_ART.md), [project specification](../../PROJECT_SPEC.md) and
+> [measured evaluation](../evaluation/RESULTS.md). Use the current presentation brief, not these original claims.
+
+
 **DBThon 2026 · VIT SCOPE · Database Systems Lab (BCSE302P)**
 **Track:** 7, Safety & Security (also fits 8, Smart Community & Civic Life)
 **Prepared:** 2 October 2026

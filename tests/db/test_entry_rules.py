@@ -1,12 +1,12 @@
-"""Rules that act after authorisation or around it: freeze, gas-reading integrity, entry log (daylight, 90 minutes,
-overlap), waivers, job guards, audit trail, account scoping. PROJECT_SPEC BR-01..BR-12, BR-22, BR-41."""
+"""Rules that act after authorisation or around it: freeze, gas-reading integrity, entry admission and exit evidence,
+waivers, job guards, audit trail, account scoping. PROJECT_SPEC BR-01..BR-12, BR-22, BR-41."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from psycopg.types.range import Range
 
-from tests.factories import Factory, yesterday_ist
+from tests.factories import Factory, IST, yesterday_ist
 from tests.helpers import expect
 
 
@@ -22,8 +22,18 @@ def authorise(conn, s):
 
 @pytest.fixture
 def live(conn, f):
-    """An AUTHORISED permit (10:00 IST yesterday, valid 4 h) with two entrants."""
+    """An AUTHORISED permit (10:00 IST yesterday, valid 4 h) for historical record tests."""
     s = f.gate_scenario(yesterday_ist(10, 0))
+    authorise(conn, s)
+    return s
+
+
+@pytest.fixture
+def live_current(conn, f):
+    """A current AUTHORISED permit with an all-day synthetic daylight window for live-admission tests."""
+    conn.execute("UPDATE rule_parameter SET value = 0 WHERE param_key = 'daylight_start_hour'")
+    conn.execute("UPDATE rule_parameter SET value = 24 WHERE param_key = 'daylight_end_hour'")
+    s = f.gate_scenario(datetime.now(IST))
     authorise(conn, s)
     return s
 
@@ -110,12 +120,18 @@ def test_a_normal_entry_is_recorded(conn, live):
     assert enter(conn, live, "e1", 10, 60)
 
 
-def test_ninety_minutes_is_the_longest_entry_and_ninety_five_is_refused_by_the_trigger(conn, live):
-    assert enter(conn, live, "e1", 10, 100)                                      # exactly 90 min
-    with expect("ZE002", r"(?s)95 minutes.*90 minute"):                           # the demo case
-        enter(conn, live, "e2", 10, 105)
-    with expect("ZE002", "exceeds"):
-        enter(conn, live, "e2", 10, 101)
+def test_historical_duration_overrun_is_kept_with_immutable_evidence(conn, live):
+    eid_90 = enter(conn, live, "e1", 10, 100)                                    # exactly 90 min
+    eid_95 = enter(conn, live, "e2", 110, 205)                                   # the 95-minute demonstration case
+    event = conn.execute("SELECT reason_code, detail FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'DURATION_OVERRUN'",
+                         (eid_95,)).fetchone()
+    assert event["detail"]["reported_minutes"] == 95 and event["detail"]["limit_minutes"] == 90
+    eid_91 = enter(conn, live, "e1", 210, 301)
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id IN (%s, %s)", (eid_95, eid_91)).fetchone()["n"] == 5
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'DURATION_OVERRUN'",
+                        (eid_90,)).fetchone()["n"] == 0
+    with expect("ZE003", "append-only"):
+        conn.execute("UPDATE permit_safety_event SET reason_code = 'OK' WHERE entry_id = %s", (eid_95,))
 
 
 def test_one_worker_cannot_be_in_two_entries_at_once_but_others_can(conn, live):
@@ -126,30 +142,55 @@ def test_one_worker_cannot_be_in_two_entries_at_once_but_others_can(conn, live):
     assert enter(conn, live, "e2", 10, 60)                                        # different worker, same time
 
 
-def test_an_open_entry_blocks_overlaps_and_only_its_exit_can_be_recorded(conn, live):
-    eid = enter(conn, live, "e1", 10, None)
+def test_an_open_entry_blocks_overlaps_and_its_long_exit_is_retained(conn, live_current):
+    live = live_current
+    eid = enter(conn, live, "e1", 0, None)
     with expect("23P01"):
-        enter(conn, live, "e1", 120, 150)
-    lower = live["at"] + timedelta(minutes=10)
-    conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s) WHERE entry_id = %s", (lower, lower + timedelta(minutes=45), eid))
+        enter(conn, live, "e1", 2, None)
+    lower = live["at"]
+    conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s) WHERE entry_id = %s", (lower, lower + timedelta(minutes=2), eid))
     with expect("ZE003", "already closed"):
         conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s) WHERE entry_id = %s", (lower, lower + timedelta(minutes=30), eid))
-    eid2 = enter(conn, live, "e2", 10, None)
+    eid2 = enter(conn, live, "e2", 0, None)
     with expect("ZE003", "exit time"):                                            # moving the start is not allowed
         conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s) WHERE entry_id = %s",
                      (lower - timedelta(minutes=5), lower + timedelta(minutes=30), eid2))
-    with expect("ZE002", "exceeds"):                                              # the exit cannot certify a 95 min stay
-        conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s) WHERE entry_id = %s", (lower, lower + timedelta(minutes=95), eid2))
+    with expect("ZE002", "five minutes ahead"):
+        conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s, '[)') WHERE entry_id = %s",
+                     (lower, lower + timedelta(minutes=95), eid2))
+    conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s, '[)') WHERE entry_id = %s",
+                 (lower, lower + timedelta(minutes=2), eid2))
+    event = conn.execute("SELECT reason_code FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'EXIT_TIME_AHEAD_OF_RECEIPT'",
+                         (eid2,)).fetchone()
+    assert event["reason_code"] == "EXIT_TIME_AHEAD_OF_RECEIPT"
 
 
-def test_only_entrants_may_enter_and_only_inside_the_permit_window(conn, live):
+def test_only_entrants_may_enter_and_historical_window_overruns_are_preserved(conn, live):
     with expect("ZE002", "ENTRANT"):
         enter(conn, live, "standby", 10, 40)
-    with expect("ZE002", "validity window"):
-        enter(conn, live, "e1", -20, 10)                                          # before authorisation
-    with expect("ZE002", "validity window"):
-        enter(conn, live, "e1", 235, 245)                                         # past valid_until (4 h)
-    assert enter(conn, live, "e1", 200, 240)                                      # ends exactly at valid_until
+    before = enter(conn, live, "e1", -20, 10)                                     # reported before authorisation
+    after = enter(conn, live, "e2", 235, 245)                                     # exit after valid_until (4 h)
+    assert enter(conn, live, "e1", 200, 230)                                      # inside validity window
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE reason_code = 'PERMIT_WINDOW_OVERRUN' AND entry_id IN (%s, %s)",
+                        (before, after)).fetchone()["n"] == 2
+
+
+def test_backdated_open_entry_cannot_bypass_current_server_clock_admission(conn, live_current):
+    with expect("ZE002", "server clock"):
+        enter(conn, live_current, "e1", -1440, None)
+
+
+def test_a_full_ninety_minute_stretch_requires_the_configured_thirty_minute_rest(conn, live_current):
+    live = live_current
+    start, end = live["at"] - timedelta(minutes=120), live["at"] - timedelta(minutes=30)
+    conn.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by) "
+                 "VALUES (%s, %s, tstzrange(%s, %s, '[)'), %s)",
+                 (live["permit"], live["e1"], start, end, live["supervisor"]))
+    receipt = conn.execute("SELECT exit_recorded_at FROM entry_log WHERE permit_id = %s AND worker_id = %s",
+                           (live["permit"], live["e1"])).fetchone()["exit_recorded_at"]
+    assert receipt is not None
+    with expect("ZE002", "must rest for 30 minutes"):
+        enter(conn, live, "e1", 0, None)
 
 
 def test_entries_need_an_authorised_permit(conn, f):
@@ -158,24 +199,27 @@ def test_entries_need_an_authorised_permit(conn, f):
         enter(conn, s, "e1", 10, 40)
 
 
-def test_entries_are_daylight_only_and_both_ends_count(conn, f):
+def test_historical_daylight_overruns_are_kept_as_evidence(conn, f):
     s = f.gate_scenario(yesterday_ist(17, 30))                                    # authorised 17:30, valid to 21:30
     authorise(conn, s)
-    with expect("ZE002", "daylight"):
-        enter(conn, s, "e1", 60, 100)                                             # 18:30 - 19:10 is night
-    with expect("ZE002", "daylight"):
-        enter(conn, s, "e1", 15, 55)                                              # starts 17:45, ends 18:25: crosses dusk
-    assert enter(conn, s, "e1", 0, 30)                                            # 17:30 - 18:00 ends exactly at the limit
+    after_dusk = enter(conn, s, "e1", 60, 100)                                    # 18:30 - 19:10 is night
+    crosses_dusk = enter(conn, s, "e2", 15, 55)                                   # starts 17:45, ends 18:25: crosses dusk
+    exactly_at_limit = enter(conn, s, "e1", 0, 30)                               # 17:30 - 18:00 ends exactly at the limit
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE reason_code = 'DAYLIGHT_OVERRUN' AND entry_id IN (%s, %s)",
+                        (after_dusk, crosses_dusk)).fetchone()["n"] == 2
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s", (exactly_at_limit,)).fetchone()["n"] == 0
 
 
 def test_daylight_hours_are_law_as_data_and_the_change_is_audited(conn, f):
     s = f.gate_scenario(yesterday_ist(17, 30))
     authorise(conn, s)
-    with expect("ZE002", "daylight"):
-        enter(conn, s, "e1", 60, 100)
+    eid = enter(conn, s, "e1", 60, 100)
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'DAYLIGHT_OVERRUN'", (eid,)).fetchone()["n"] == 1
     conn.execute("UPDATE rule_parameter SET value = 24 WHERE param_key = 'daylight_end_hour'")
-    assert enter(conn, s, "e1", 60, 100)
-    row = conn.execute("SELECT old_data, new_data FROM audit_log WHERE table_name = 'rule_parameter' AND action = 'UPDATE'").fetchone()
+    next_id = enter(conn, s, "e1", 110, 150)
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'DAYLIGHT_OVERRUN'", (next_id,)).fetchone()["n"] == 0
+    row = conn.execute("SELECT old_data, new_data FROM audit_log WHERE table_name = 'rule_parameter' AND action = 'UPDATE' "
+                        "AND new_data ->> 'param_key' = 'daylight_end_hour' ORDER BY log_id DESC LIMIT 1").fetchone()
     assert float(row["old_data"]["value"]) == 18 and float(row["new_data"]["value"]) == 24
 
 
@@ -185,12 +229,13 @@ def test_entries_cannot_be_deleted(conn, live):
         conn.execute("DELETE FROM entry_log WHERE entry_id = %s", (eid,))
 
 
-def test_a_permit_cannot_close_while_someone_is_inside(conn, live):
-    eid = enter(conn, live, "e1", 10, None)
+def test_a_permit_cannot_close_while_someone_is_inside(conn, live_current):
+    live = live_current
+    eid = enter(conn, live, "e1", 0, None)
     with expect("ZE003", "still inside"):
         conn.execute("UPDATE entry_permit SET status = 'CLOSED' WHERE permit_id = %s", (live["permit"],))
-    lower = live["at"] + timedelta(minutes=10)
-    conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s) WHERE entry_id = %s", (lower, lower + timedelta(minutes=50), eid))
+    lower = live["at"]
+    conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s) WHERE entry_id = %s", (lower, lower + timedelta(minutes=3), eid))
     conn.execute("UPDATE entry_permit SET status = 'CLOSED' WHERE permit_id = %s", (live["permit"],))
     p = conn.execute("SELECT status, ended_at FROM entry_permit WHERE permit_id = %s", (live["permit"],)).fetchone()
     assert p["status"] == "CLOSED" and p["ended_at"] is not None
@@ -198,10 +243,18 @@ def test_a_permit_cannot_close_while_someone_is_inside(conn, live):
         enter(conn, live, "e2", 70, 90)
 
 
-def test_stop_work_aborts_an_authorised_permit_even_with_a_worker_inside(conn, live):
-    enter(conn, live, "e1", 10, None)
+def test_stop_work_aborts_an_authorised_permit_and_exit_remains_recordable(conn, live_current):
+    live = live_current
+    eid = enter(conn, live, "e1", 0, None)
     conn.execute("UPDATE entry_permit SET status = 'ABORTED', end_reason = 'Worker refused entry' WHERE permit_id = %s", (live["permit"],))
-    assert conn.execute("SELECT status FROM entry_permit WHERE permit_id = %s", (live["permit"],)).fetchone()["status"] == "ABORTED"
+    end = live["at"] + timedelta(minutes=3)
+    conn.execute("UPDATE entry_log SET period = tstzrange(%s, %s, '[)') WHERE entry_id = %s", (live["at"], end, eid))
+    p = conn.execute("SELECT status, end_reason FROM entry_permit WHERE permit_id = %s", (live["permit"],)).fetchone()
+    entry = conn.execute("SELECT upper(period) AS exited_at, exit_recorded_at FROM entry_log WHERE entry_id = %s", (eid,)).fetchone()
+    assert p == {"status": "ABORTED", "end_reason": "Worker refused entry"}
+    assert entry["exited_at"] == end and entry["exit_recorded_at"] is not None
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'EXIT_AFTER_PERMIT_STOP'",
+                        (eid,)).fetchone()["n"] == 1
 
 
 @pytest.mark.parametrize("final", ["CLOSED", "ABORTED", "CANCELLED"])

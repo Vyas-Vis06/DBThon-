@@ -168,6 +168,7 @@ def deploy_machine(job_id: int, body: DeploymentIn, db: DB, principal: Principal
                             ended_at=body.ended_at, outcome=body.outcome, recorded_by=principal.user_id)
     db.add(row)
     db.flush()
+    db.refresh(row)                              # include the DB-assigned outcome receipt when finalized at creation
     return to_dict(row)
 
 
@@ -180,6 +181,7 @@ def finish_deployment(deploy_id: int, body: DeploymentFinishIn, db: DB, principa
         raise Conflict("This deployment already has an outcome.")
     d.ended_at, d.outcome = body.ended_at, body.outcome
     db.flush()
+    db.refresh(d)                                # the finalization instant is assigned by the database trigger
     if body.outcome == "CLEARED":                # a cleared blockage completes the job
         job = db.get(Job, d.job_id)
         if job.status in ("PLANNED", "IN_PROGRESS"):

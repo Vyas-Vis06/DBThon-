@@ -160,10 +160,9 @@ def test_gas_limits_are_rule_parameters_not_code(conn, f):
 
 
 def test_a_missing_rule_parameter_is_an_error_not_a_silent_default(conn, f):
-    s = f.gate_scenario(yesterday_ist())
-    conn.execute("DELETE FROM rule_parameter WHERE param_key = 'gas_max_age_min'")
-    with expect("ZE005", "gas_max_age_min"):
-        authorise(conn, s)
+    # Parameters referenced by immutable history cannot be deleted. Missing keys still fail closed.
+    with expect("ZE005", "missing_test_parameter"):
+        conn.execute("SELECT rule_num('missing_test_parameter')")
 
 
 # --- the demo: denied with exactly three legal reasons, then fixed and authorised -----------------------

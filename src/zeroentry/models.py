@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (BigInteger, Boolean, Date, DateTime, FetchedValue, ForeignKey, ForeignKeyConstraint,
-                        LargeBinary, Numeric, SmallInteger, Text)
+                        Integer, LargeBinary, Numeric, SmallInteger, Text)
 from sqlalchemy.dialects.postgresql import JSONB, TSTZRANGE, Range
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -159,6 +159,7 @@ class MachineDeployment(Base):
     outcome: Mapped[str | None] = mapped_column(Text)
     recorded_by: Mapped[int | None] = _fk("app_user.user_id", nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    outcome_recorded_at: Mapped[datetime | None] = mapped_column(TS, server_default=DB, server_onupdate=DB)
 
 
 class MechanisationWaiver(Base):
@@ -245,6 +246,7 @@ class EntryLog(Base):
     period: Mapped[Range[datetime]] = mapped_column(TSTZRANGE)
     recorded_by: Mapped[int] = _fk("app_user.user_id")
     recorded_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    exit_recorded_at: Mapped[datetime | None] = mapped_column(TS, server_default=DB, server_onupdate=DB)
 
 
 # --- consequences ----------------------------------------------------------------------------------
@@ -352,6 +354,68 @@ class RuleParameter(Base):
     is_assumption: Mapped[bool] = mapped_column(Boolean, server_default=DB)
     updated_by: Mapped[int | None] = _fk("app_user.user_id", nullable=True)
     updated_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    revision: Mapped[int] = mapped_column(Integer, server_default=DB, server_onupdate=DB)
+    source_code: Mapped[str] = _fk("policy_source.source_code", type_=Text)
+
+
+class PolicySource(Base):
+    __tablename__ = "policy_source"
+    source_code: Mapped[str] = _pk(Text)
+    source_type: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str | None] = mapped_column(Text)
+    source_version: Mapped[str] = mapped_column(Text)
+    citation_clause: Mapped[str] = mapped_column(Text)
+    applicability: Mapped[str] = mapped_column(Text)
+
+
+class LegalClauseSource(Base):
+    __tablename__ = "legal_clause_source"
+    clause_code: Mapped[str] = mapped_column(Text, ForeignKey("legal_clause.clause_code"), primary_key=True)
+    source_code: Mapped[str] = mapped_column(Text, ForeignKey("policy_source.source_code"), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(SmallInteger)
+
+
+class RuleParameterHistory(Base):
+    __tablename__ = "rule_parameter_history"
+    history_id: Mapped[int] = _pk()
+    param_key: Mapped[str] = _fk("rule_parameter.param_key", type_=Text)
+    revision: Mapped[int] = mapped_column(Integer)
+    value: Mapped[Decimal] = mapped_column(Numeric)
+    unit: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    legal_ref: Mapped[str] = mapped_column(Text)
+    is_assumption: Mapped[bool] = mapped_column(Boolean)
+    source_code: Mapped[str] = _fk("policy_source.source_code", type_=Text)
+    effective_at: Mapped[datetime] = mapped_column(TS)
+    actor_user_id: Mapped[int | None] = mapped_column(BigInteger)
+    change_reason: Mapped[str] = mapped_column(Text)
+    recorded_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class PermitAuthorizationDecision(Base):
+    __tablename__ = "permit_authorization_decision"
+    decision_id: Mapped[int] = _pk()
+    permit_id: Mapped[int] = _fk("entry_permit.permit_id")
+    decision_kind: Mapped[str] = mapped_column(Text)
+    decision_at: Mapped[datetime] = mapped_column(TS)
+    actor_user_id: Mapped[int] = mapped_column(BigInteger)
+    snapshot_format: Mapped[int] = mapped_column(SmallInteger, server_default=DB)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    snapshot_sha256: Mapped[str] = mapped_column(Text)
+    captured_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class PermitSafetyEvent(Base):
+    __tablename__ = "permit_safety_event"
+    event_id: Mapped[int] = _pk()
+    permit_id: Mapped[int] = _fk("entry_permit.permit_id")
+    entry_id: Mapped[int | None] = _fk("entry_log.entry_id", nullable=True)
+    event_key: Mapped[str] = mapped_column(Text)
+    event_type: Mapped[str] = mapped_column(Text)
+    reason_code: Mapped[str] = mapped_column(Text)
+    detail: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    occurred_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
 
 
 class LegalClause(Base):

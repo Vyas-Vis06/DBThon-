@@ -1,6 +1,6 @@
 # ER diagrams
 
-Thirty tables do not fit one readable picture, so the model is drawn as four diagrams that share entities. Column-level detail
+The tables are drawn in smaller diagrams that share entities. Column-level detail
 (every type, constraint, index, trigger and policy) is in the generated [SCHEMA_REFERENCE.md](SCHEMA_REFERENCE.md); the reasons
 behind the design are in [DATABASE_DESIGN.md](DATABASE_DESIGN.md).
 
@@ -10,6 +10,52 @@ foreign key, and every foreign key is drawn, except the "who did it" columns tha
 
 Notation (crow's foot): `||` exactly one · `|o` zero or one · `o{` zero or more. GitHub renders these diagrams; elsewhere paste
 them into <https://mermaid.live>.
+
+## Safety evidence and decision provenance (0011–0013)
+
+```mermaid
+erDiagram
+  entry_permit ||--o{ permit_safety_event : "retains safety history"
+  entry_log |o--o{ permit_safety_event : "identifies physical interval"
+  entry_permit ||--o| permit_authorization_decision : "preserves original authorization"
+  policy_source ||--o{ legal_clause_source : "classifies citation"
+  legal_clause ||--o{ legal_clause_source : "references source"
+  policy_source ||--o{ rule_parameter : "explains active value"
+  rule_parameter ||--o{ rule_parameter_history : "retains revisions"
+  policy_source ||--o{ rule_parameter_history : "explains historical value"
+
+  permit_safety_event {
+    bigint event_id PK
+    bigint permit_id FK
+    bigint entry_id FK "optional"
+    text event_key UK
+    text event_type
+    jsonb detail
+  }
+  permit_authorization_decision {
+    bigint decision_id PK
+    bigint permit_id FK, UK
+    jsonb snapshot
+    text snapshot_sha256
+  }
+  policy_source {
+    text source_code PK
+    text source_type
+    text citation_clause
+    text applicability
+  }
+  legal_clause_source {
+    text clause_code PK, FK
+    text source_code PK, FK
+  }
+  rule_parameter_history {
+    bigint history_id PK
+    text param_key FK
+    integer revision
+    text source_code FK
+    timestamptz effective_at
+  }
+```
 
 ## 1. Identity, access and the organisations
 

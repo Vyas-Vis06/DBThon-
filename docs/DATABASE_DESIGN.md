@@ -21,7 +21,7 @@ in [`database/migrations/sql/`](../database/migrations/sql/). Business-rule IDs 
 
 ## 2. Entities and relationships
 
-Thirty tables, grouped by purpose. Core entities and their main relationships (cardinalities as drawn in ER_DIAGRAM):
+Thirty-five tables, grouped by purpose. Core entities and their main relationships (cardinalities as drawn in ER_DIAGRAM):
 
 | Group | Tables | Key relationships |
 |---|---|---|
@@ -211,3 +211,25 @@ rows; the user is passed per transaction with `set_config(..., true)`. Details a
 * Migrations are numbered raw SQL files run by Alembic, forward-only; never edit an applied one
   (`python scripts/db.py new <name>` scaffolds the next). Reference data (roles, clauses, rules, parameters, gear) ships in
   migration `0003`; demo data is separate (`database/seeds/`).
+
+## Audit hardening (0011–0013)
+
+`permit_safety_event` retains immutable stop, overstay and exit-violation evidence. Its optional `entry_id` FK is deferred
+so an event created in the entry transaction still requires the physical log row at commit. Crew/gear parent IDs are
+immutable. New admission uses current conditions; closing an existing physical interval preserves reality after stop.
+`machine_deployment.outcome_recorded_at` records finalization processing time separately from original row receipt and
+reported event time. Legacy audit backfill cannot establish exact commit time; unproven outcomes remain NULL.
+
+Invoice insertion and alert/incident creation take a complaint lock first. Hold placement then takes the invoice row lock
+shared with approval/payment. Payment-first leaves an already-paid historical invoice without an active hold; hold-first
+blocks payment. Regression tests run both interleavings and both source types, including invoice creation races.
+These financial write paths require `READ COMMITTED` and reject other isolation levels with SQLSTATE `40001` before
+writing. Waiting on a lock alone cannot refresh a repeatable-read snapshot; direct SQL callers must retry the entire
+transaction at the supported isolation level. The API already uses `READ COMMITTED`.
+
+`policy_source` stores immutable classifications and applicability. `legal_clause_source` links each clause to its relevant
+sources. `rule_parameter_history` appends current-value revisions with a server timestamp, actor and written reason.
+`permit_authorization_decision` stores one immutable successful-transition JSONB explanation plus a database-computed
+SHA-256 of its PostgreSQL text rendering. Policy share locks keep active thresholds and the snapshot aligned. Snapshot
+JSON deliberately preserves historical values rather than normalizing them into mutable current rows. This is an explanation
+artifact with a database-owner trust boundary, not a legal compiler or externally anchored signature.

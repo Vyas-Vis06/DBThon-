@@ -9,7 +9,9 @@ clone of that template for EVERY test (CREATE DATABASE ... TEMPLATE). Consequenc
 """
 
 import itertools
+import os
 import pathlib
+import uuid
 from dataclasses import dataclass
 
 import psycopg
@@ -17,12 +19,14 @@ import pytest
 
 try:
     import pgserver
-except ImportError:                              # no wheel for this Python: say what to do instead of a traceback
-    pytest.exit("The tests start an embedded PostgreSQL from the `pgserver` wheel, which exists for Python 3.9-3.12 only. "
+except ImportError:                              # external disposable service can run without the embedded wheel
+    pgserver = None
+    if not os.getenv("ZEROENTRY_TEST_PG_URI"):
+        pytest.exit("The tests start an embedded PostgreSQL from the `pgserver` wheel, which exists for Python 3.9-3.12 only. "
                 "Create the venv with Python 3.11 or 3.12 (see docs/SETUP.md), then: pip install -e \".[dev]\"", returncode=4)
 from alembic import command
 from alembic.config import Config
-from psycopg.conninfo import make_conninfo
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from psycopg.rows import dict_row
 
 from zeroentry.db import url_for
@@ -45,13 +49,13 @@ class Cluster:
     uri: str            # libpq URI from pgserver: TCP on Windows, a Unix-socket directory on Linux and macOS
 
     def owner_url(self, db: str) -> str:
-        return url_for(self.uri, db)
+        return url_for(self.uri, db, password=conninfo_to_dict(self.uri).get("password"))
 
     def app_url(self, db: str) -> str:
         return url_for(self.uri, db, "ze_app", APP_PASSWORD)
 
     def connect(self, db: str, user: str = "postgres", autocommit: bool = True) -> psycopg.Connection:
-        password = APP_PASSWORD if user == "ze_app" else ""
+        password = APP_PASSWORD if user == "ze_app" else conninfo_to_dict(self.uri).get("password", "")
         return psycopg.connect(make_conninfo(self.uri, dbname=db, user=user, password=password),
                                autocommit=autocommit, row_factory=dict_row)
 
@@ -77,6 +81,12 @@ class Db:
 
 @pytest.fixture(scope="session")
 def cluster(tmp_path_factory) -> Cluster:
+    external = os.getenv("ZEROENTRY_TEST_PG_URI")
+    if external:
+        # Opt-in only: use a disposable CI/test server, never a development/production server.
+        # The harness creates/drops private databases and changes the shared ze_app test role.
+        yield Cluster(external)
+        return
     srv = pgserver.get_server(tmp_path_factory.mktemp("pg"), cleanup_mode="delete")
     try:
         yield Cluster(srv.get_uri())
@@ -86,16 +96,21 @@ def cluster(tmp_path_factory) -> Cluster:
 
 @pytest.fixture(scope="session")
 def template_db(cluster: Cluster) -> str:
+    name = "ze_template_" + uuid.uuid4().hex[:12]
     with cluster.connect("postgres") as admin:
-        admin.execute("CREATE DATABASE ze_template")
-    migrate(cluster.owner_url("ze_template"))
-    with cluster.connect("postgres") as admin:
-        admin.execute(f"ALTER ROLE ze_app LOGIN PASSWORD '{APP_PASSWORD}'")
-    return "ze_template"
+        admin.execute(f'CREATE DATABASE "{name}"')
+    try:
+        migrate(cluster.owner_url(name))
+        with cluster.connect("postgres") as admin:
+            admin.execute(f"ALTER ROLE ze_app LOGIN PASSWORD '{APP_PASSWORD}'")
+        yield name
+    finally:
+        with cluster.connect("postgres") as admin:
+            admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
 
 
 def _clone(cluster: Cluster, template: str, prefix: str):
-    name = f"{prefix}{next(_counter)}"
+    name = f"{prefix}{next(_counter)}_{uuid.uuid4().hex[:12]}"
     with cluster.connect("postgres") as admin:
         admin.execute(f'CREATE DATABASE "{name}" TEMPLATE {template}')
     try:

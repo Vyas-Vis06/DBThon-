@@ -10,11 +10,12 @@ EXPECTED_TABLES = {
     "machine", "job", "machine_deployment", "mechanisation_waiver", "entry_permit", "permit_crew", "gear_item",
     "gear_issue", "gas_detector", "gas_reading", "entry_log", "incident", "compensation_case", "invoice",
     "invoice_hold", "detection_rule", "shadow_entry_alert", "shadow_entry_alert_event", "rule_parameter",
-    "legal_clause", "audit_log",
+    "legal_clause", "audit_log", "permit_safety_event", "policy_source", "legal_clause_source",
+    "rule_parameter_history", "permit_authorization_decision",
 }
 
 
-def test_thirty_application_tables_exist(conn):
+def test_application_tables_exist(conn):
     names = {r["table_name"] for r in conn.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")}
     assert names - {"alembic_version"} == EXPECTED_TABLES

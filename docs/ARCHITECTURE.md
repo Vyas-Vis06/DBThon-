@@ -20,7 +20,7 @@ flowchart LR
     E["errors.py<br/>SQLSTATE -> HTTP"]
   end
   subgraph PG["PostgreSQL 16"]
-    S["tables + constraints<br/>(30 tables)"]
+    S["tables + constraints<br/>(35 tables)"]
     T["triggers and functions<br/>the gate, consequences, detection"]
     P["row-level security<br/>(app.* settings per transaction)"]
   end
@@ -40,7 +40,7 @@ validates input shapes, and turns database refusals into readable HTTP errors.
 
 | Component | Path | Responsibility |
 |---|---|---|
-| Schema and rules | `database/migrations/sql/0001-0010` | tables, constraints, triggers, functions, procedure, views, privileges, RLS (forward-only migrations run by Alembic) |
+| Schema and rules | `database/migrations/sql/0001-0013` | tables, constraints, triggers, functions, procedure, views, privileges, RLS (forward-only migrations run by Alembic) |
 | Reference data | migration `0003` | roles, legal clauses, rule parameters, resolution types, detection rules, gear catalogue |
 | Demo data | `database/seeds/`, `src/zeroentry/seed.py` | deterministic scenarios S0-S10 and demo logins (development only) |
 | Configuration | `config.py`, `.env` | validated settings; production refuses insecure values |
@@ -89,12 +89,17 @@ sequenceDiagram
 Functions that must cross role boundaries (`record_incident`, `audit_row`, `invoice_auto_hold`, `stop_work`, `lock_permit` and
 the RLS helpers) run with owner rights and check the caller themselves.
 
-## Detection runs as a scan, not a daemon
+## Periodic database maintenance
 
-`scan_shadow_entries()` is idempotent and takes its clock as a parameter. It runs when `scripts/dev.py` starts and whenever an
-engineer or admin calls `POST /api/v1/detections/scan` (a button in the UI). There is no scheduler in this repository. A real
-deployment would call the same function from cron or `pg_cron` (for example hourly); because candidates depend only on
-*recorded* timestamps, the schedule never changes the result, only how soon it appears.
+The API lifespan calls `sweep_permit_safety()` and `scan_shadow_entries(now())` at startup and every configured interval
+(default 30 seconds). The database owns each decision. Per-task advisory transaction locks suppress overlapping ticks across
+processes. Safety commits separately so a failed detection scan cannot roll back a stop; failures log and retry next tick.
+Maintenance uses trusted service context with no fabricated human user, and safety/alert events remain durable in PostgreSQL.
+
+New open entries always check current clauses, worker rest and the server clock. Gas/dependency writes revalidate affected
+permits. The periodic sweep covers changes due to time alone, including stale readings, validity expiry and overstays.
+Record exits on an already stopped permit and retain violation events. An API process or database outage delays sweeps;
+this mechanism has no independent instrument or physical access-control channel.
 
 ## Runtime topologies
 

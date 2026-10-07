@@ -95,7 +95,17 @@ class Factory:
                                   "outcome": outcome, **kw}
         if recorded_at is not None:
             values["recorded_at"] = recorded_at
-        return self.insert("machine_deployment", "deploy_id", **values)
+        deploy_id = self.insert("machine_deployment", "deploy_id", **values)
+        if outcome is not None and recorded_at is not None:
+            # Tests that model a historical receipt explicitly backfill only the new server-owned timestamp.
+            # Disable this one trigger inside a throwaway owner transaction; live inserts/finalizations always
+            # use clock_timestamp(), including inserts made by the database owner.
+            with self.c.transaction():
+                self.c.execute("ALTER TABLE machine_deployment DISABLE TRIGGER trg_machine_deployment_outcome_guard")
+                self.c.execute("UPDATE machine_deployment SET outcome_recorded_at = %s WHERE deploy_id = %s",
+                               (recorded_at, deploy_id))
+                self.c.execute("ALTER TABLE machine_deployment ENABLE TRIGGER trg_machine_deployment_outcome_guard")
+        return deploy_id
 
     def waiver(self, job_id: int, approver_id: int, **kw: Any) -> int:
         return self.insert("mechanisation_waiver", "waiver_id", **{

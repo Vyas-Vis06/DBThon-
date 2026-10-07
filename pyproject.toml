@@ -29,7 +29,7 @@ dev = ["pytest>=8", "pytest-xdist>=3", "httpx>=0.27", "pgserver>=0.1.4; python_v
 where = ["src"]
 
 [tool.setuptools.package-data]
-zeroentry = ["web/static/**/*"]
+zeroentry = ["web/shell.html", "web/static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

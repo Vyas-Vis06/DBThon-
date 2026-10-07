@@ -1,6 +1,5 @@
 # Runs the whole test suite on every push and pull request.
-# No PostgreSQL service is needed: the tests start an embedded PostgreSQL 16 from the `pgserver` wheel,
-# which exists for Python 3.9-3.12 on Linux, macOS and Windows.
+# The OS matrix uses embedded PostgreSQL 16; a separate job uses an official PostgreSQL 16 service.
 name: tests
 
 on:
@@ -35,6 +34,14 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest -n auto 2>&1 | tee pytest.log
+      - name: Verify built wheel UI
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        shell: bash
+        run: |
+          python -m pip wheel --no-deps . -w dist
+          python -m venv --system-site-packages wheel-check
+          wheel-check/bin/python -m pip install --no-deps --force-reinstall dist/zeroentry-*.whl
+          wheel-check/bin/python scripts/check_wheel.py
       # Job logs need a GitHub sign-in; annotations do not. Put the end of a failing run where anyone can read it.
       - name: Show the failure in the run summary
         if: failure()
@@ -45,3 +52,30 @@ jobs:
           tail = Path("pytest.log").read_text(errors="replace").splitlines()[-60:]
           print("::error title=pytest (last 60 lines)::" + "%0A".join(l.replace("%", "%25").replace("\r", "") for l in tail))
           EOF
+
+  postgres-service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci_disposable_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ZEROENTRY_TEST_PG_URI: postgresql://postgres:ci_disposable_only@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      # Serial: bootstrap/reset tests deliberately change the cluster-wide ze_app test password.
+      - run: python -m pytest -n 0

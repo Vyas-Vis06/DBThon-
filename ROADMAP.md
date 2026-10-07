@@ -8,16 +8,32 @@ A task is never `[x]` on "it compiles".
 
 ## Current state (2026-10-07): read this first
 
-M0-M5 are implemented. Everything marked `[x]` is verified by the test suite (run on Linux, Windows and macOS in CI) or by the command
-named in the row. The only `[-]` rows are the UI screens: built and walked through by hand in a browser (the demo flow again on
-2026-10-07), but **not covered by automated browser tests**.
+M0-M5 form the original implemented foundation. The audit hardening below adds three forward migrations (0011–0013),
+bringing the application to 35 tables. UI screens remain manually verified, without an automated browser suite.
+Earlier CI results describe the foundation; new branch CI results must be checked separately.
 
 Changed in the second session: the full documentation set and its drift tests; a real concurrency bug in the entry gate found and
 fixed (M2-08); Linux/macOS support for the embedded PostgreSQL (CI caught it); tests for `scripts/db.py`; the repository published
 to GitHub with CI.
 
-Next step: pick from the backlog below (automated browser tests first), and verify the legal references against the Gazette
-before presenting. Details: [DEV_LOG.md](docs/development/DEV_LOG.md).
+The legal/source review and bounded novelty analysis are in [POLICY_AND_PRIOR_ART.md](docs/POLICY_AND_PRIOR_ART.md).
+Presentation claims and synthetic measurements are in [PRESENTATION_BRIEF.md](docs/development/PRESENTATION_BRIEF.md)
+and [evaluation/RESULTS.md](docs/evaluation/RESULTS.md). Pilot work remains in the backlog below.
+
+## Audit hardening and presentation release
+
+| Task | Status | Verification |
+|---|---|---|
+| Immutable crew/gear parent IDs; continuing authorization; preserve exit after stop and violation evidence; statutory 30-minute rest | [x] | `tests/db/test_safety_lifecycle.py`, `test_entry_rules.py`, `tests/api/test_workflow.py` |
+| Server receipt for machine finalization; serialized invoice holds/payment/source races | [x] | `tests/db/test_temporal_evidence_and_invoice_races.py`, `tests/api/test_temporal_evidence.py` |
+| Classified sources, immutable policy revisions and authorization snapshots | [x] | `tests/db/test_policy_provenance.py`, `tests/api/test_decision_history_api.py` |
+| Fresh server clock after authorization locks; runtime metadata grants tightened | [x] | `tests/db/test_integration_adversarial.py` |
+| Automatic safety sweep and detection, with independent commits and bounded locks | [x] | `tests/db/test_maintenance.py` |
+| Installed wheel includes shell and static UI | [x] | `scripts/check_wheel.py` against a separately installed wheel |
+| Synthetic sensor demonstration using authenticated local API | [x] | `scripts/simulate_gas.py` run on isolated fresh demo data; unsafe BOTTOM reading stops permit; UI exit recorded after stop |
+| PostgreSQL 16 service CI alongside existing OS matrix | [-] | workflow implemented; branch Actions run pending |
+| Reproducible 1k/10k/100k synthetic evidence-gap evaluation with labelled baseline | [x] | `scripts/evaluate.py`, `docs/evaluation/results.json` |
+| Original-decision, safety-history and policy-history screens | [-] | manually verified in browser; automated browser coverage pending |
 
 ## Milestone map
 
@@ -140,11 +156,12 @@ Agree on those two files and the streams do not collide.
 ## Backlog (not started, not required for the demo)
 
 * Automated browser tests for the demo flow (for example Playwright driving `scripts/dev.py`).
-* Run the test suite against a real PostgreSQL service container in CI (today only the embedded server is exercised; a
-  `docker run` recipe is in SETUP.md but was not run here).
 * ULB-scoped visibility for engineers and supervisors (extend RLS with `ulb_id`).
 * Map view of manholes and alerts.
-* Simulated gas-sensor feed instead of typed readings.
+* Authenticated physical instruments, calibration workflows and independently verifiable telemetry.
 * Tamil-language UI strings.
 * Signed permit PDF export.
-* Rest-interval rule once the SOP states a length (assumption A-04).
+* External anchoring/signing of decision artifacts and independent audit retention.
+* Field validation of SE1/SE2 precision and alert review; missing records alone do not establish physical entry.
+* More complete equipment applicability by task and shared versus individual equipment, reviewed with domain experts.
+* Production monitoring, notification delivery, backups, recovery drills and a legal/domain pilot review.

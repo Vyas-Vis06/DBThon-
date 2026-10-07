@@ -4,6 +4,45 @@ Newest entry first. Resume from the latest entry; do not reconstruct the plan fr
 
 ---
 
+## 2026-10-07 · Audit hardening, preserved decisions and presentation evidence
+
+**State:** original foundation extended on `feat/audit-hardening-and-evaluation`, with three new forward migrations,
+35 tables, new scoped read endpoints and presentation screens. Original migrations 0001–0010 remain unchanged.
+Full local release suite: **568 passed in 30.21 seconds**, macOS, Python 3.12.11, embedded PostgreSQL 16.2.
+Branch CI is configured for the original five OS/Python jobs and a separate PostgreSQL 16 service; see Actions for its
+current result. The release is for review, not an automatic merge or a production safety certification.
+
+### Implemented and verified
+
+* Immutable crew/gear parents; live revalidation; time-based maintenance; rest interval; truthful exits after stop and
+  durable violation history (`0011`). Private locking/event helpers have runtime execution revoked.
+* Final-outcome receipt semantics and audited legacy backfill; common complaint/invoice serialization for alert and
+  incident holds versus payment, approval and invoice creation (`0012`). Financial writers require `READ COMMITTED`;
+  repeatable-read snapshots fail with retryable `40001` rather than accept stale decisions.
+* Classified primary sources, reasoned policy revisions and immutable successful authorization snapshots with
+  PostgreSQL SHA-256 (`0013`). Runtime actors/receipts are DB-owned; authorization samples a fresh clock after locks.
+* Automatic safety/detection tasks commit separately with bounded waits and advisory locks. Failure injection confirms
+  that a failed scan cannot roll back an already committed stop.
+* Built and separately installed wheel passes shell/JS/CSS smoke checks. No new application dependency added.
+* Synthetic SE1 evaluation at 1k/10k/100k complaints, seven query samples per scale, raw plans/counts/confusion matrices
+  and source hashes. The saved 100k run measured 451.00 ms p50 and 627.16 ms p95 for SE1 and 4326.30 ms for first scan.
+  Six synthetic labels classify as expected; this is not field accuracy or an equal-task speedup claim.
+* Fresh isolated local demo: expected five initial alerts; UI denial with five reasons; completed crew/gear through API;
+  simulator-authorized safe readings; an open entry; low-oxygen stop; browser-recorded exit after stop; three retained
+  safety events. A subsequent policy revision left the original decision bytes/digest unchanged.
+* Original-decision, safety-history and policy-history screens were manually walked through in the in-app browser.
+  Automated browser coverage remains unimplemented.
+
+### Handoff
+
+[AUDIT_RELEASE.md](AUDIT_RELEASE.md) maps findings to changes and the earlier schema.
+[PRESENTATION_BRIEF.md](PRESENTATION_BRIEF.md), [DEMO_SCRIPT.md](DEMO_SCRIPT.md),
+[POLICY_AND_PRIOR_ART.md](../POLICY_AND_PRIOR_ART.md) and [evaluation/RESULTS.md](../evaluation/RESULTS.md) support the
+presentation. Remaining pilot/production work is tracked in ROADMAP; local decision hashes have no external anchor,
+physical instruments are not authenticated, equipment applicability remains illustrative, and history starts at cutover.
+
+---
+
 ## 2026-10-07 · Documentation, a concurrency fix, cross-platform support, published to GitHub
 
 **State:** M0-M5 complete; only the UI rows stay `[-]` (manual browser verification, no automated browser tests). Repository at

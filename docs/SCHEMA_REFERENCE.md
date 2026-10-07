@@ -4,7 +4,7 @@
 > fails when this file is out of date. The reasoning behind the design is in [DATABASE_DESIGN.md](DATABASE_DESIGN.md) and the
 > diagrams are in [ER_DIAGRAM.md](ER_DIAGRAM.md).
 
-Schema revision: `0010` · PostgreSQL 16 · 30 application tables.
+Schema revision: `0013` · PostgreSQL 16 · 35 application tables.
 
 How to read it: *a foreign key with no `ON DELETE` clause is `NO ACTION`: deleting the referenced row is refused while
 dependants exist.* Check, unique and exclusion constraints are shown exactly as PostgreSQL stores them. Row-level security
@@ -30,14 +30,19 @@ policies and triggers are listed per table.
 | [`invoice_hold`](#invoice_hold) | Reason an invoice cannot be approved or paid, with provenance. |
 | [`job`](#job) | Work order for a complaint, assigned to a contractor. |
 | [`legal_clause`](#legal_clause) | Titles and legal references for each entry-gate clause. |
+| [`legal_clause_source`](#legal_clause_source) | One or more classified source/applicability records for each entry checklist clause. |
 | [`machine`](#machine) | Mechanised cleaning equipment. |
 | [`machine_deployment`](#machine_deployment) | A machine used on a job and its outcome (clearance evidence). |
 | [`manhole`](#manhole) | A sewer or septic access point. |
 | [`mechanisation_waiver`](#mechanisation_waiver) | Written reason, approved by the RSA, why a machine cannot do the job. |
+| [`permit_authorization_decision`](#permit_authorization_decision) | Immutable database-created JSONB snapshot for each successful authorization transition; not a formal proof or owner-resistant signature. |
 | [`permit_crew`](#permit_crew) | Crew of a permit with exactly one role per worker. |
+| [`permit_safety_event`](#permit_safety_event) | Append-only local safety event evidence; it does not assert external delivery. |
+| [`policy_source`](#policy_source) | Migration-managed source metadata; source type distinguishes law, court directions, guidance and product policy. |
 | [`resolution_type`](#resolution_type) | How a complaint was resolved and whether that resolution must leave evidence. |
 | [`role`](#role) | The six application roles. |
 | [`rule_parameter`](#rule_parameter) | Statutory thresholds and policy numbers as editable, audited data. |
+| [`rule_parameter_history`](#rule_parameter_history) | Append-only current-value change history with actor/reason/source; not a historical rule-replay engine. |
 | [`shadow_entry_alert`](#shadow_entry_alert) | Persisted suspicion that an entry happened unrecorded. |
 | [`shadow_entry_alert_event`](#shadow_entry_alert_event) | Append-only lifecycle history of alerts. |
 | [`ulb`](#ulb) | Urban local body / municipal zone. |
@@ -229,6 +234,7 @@ Licensed contractor; status ACTIVE/SUSPENDED/BLACKLISTED.
 **Triggers**
 
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('contractor_id')`
+- `trg_contractor_safety_revalidate`: `AFTER UPDATE OF status, licence_valid_until ... revalidate_changed_safety_dependency()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 
@@ -276,6 +282,7 @@ A worker's time underground; overlaps are excluded.
 | `period` | tstzrange | NOT NULL |  |
 | `recorded_by` | bigint | NOT NULL |  |
 | `recorded_at` | timestamp with time zone | NOT NULL | `now()` |
+| `exit_recorded_at` | timestamp with time zone | nullable |  |
 
 **Constraints**
 
@@ -342,7 +349,11 @@ Permit to enter; AUTHORISED only through the clause gate.
 
 **Triggers**
 
+- `trg_00_lock_authorization_policy`: `BEFORE UPDATE ... lock_authorization_policy()`
+- `trg_01_runtime_authorization_clock`: `BEFORE UPDATE ... stamp_runtime_authorization_clock()`
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('permit_id')`
+- `trg_permit_abort_event`: `AFTER UPDATE OF status ... permit_abort_event()`
+- `trg_permit_authorization_snapshot`: `AFTER UPDATE ... capture_permit_authorization_decision()`
 - `trg_permit_delete_guard`: `BEFORE DELETE ... permit_delete_guard()`
 - `trg_permit_guard`: `BEFORE UPDATE ... permit_guard()`
 - `trg_permit_insert_guard`: `BEFORE INSERT ... permit_insert_guard()`
@@ -377,6 +388,7 @@ Gas detector with calibration expiry.
 **Triggers**
 
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('detector_id')`
+- `trg_detector_safety_revalidate`: `AFTER UPDATE OF calibration_valid_until ... revalidate_changed_safety_dependency()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 
@@ -426,6 +438,7 @@ Atmosphere reading at a depth level (append-only).
 - `trg_append_only`: `BEFORE DELETE OR UPDATE ... forbid_change()`
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('reading_id')`
 - `trg_gas_reading_guard`: `BEFORE INSERT ... gas_reading_guard()`
+- `trg_gas_reading_revalidate`: `AFTER INSERT ... gas_reading_revalidate()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 
@@ -542,8 +555,10 @@ Fatality, disability or near miss.
 
 **Triggers**
 
+- `trg_00_incident_insert_isolation`: `BEFORE INSERT ... require_read_committed_financialrace()`
 - `trg_append_only`: `BEFORE DELETE OR UPDATE ... forbid_change()`
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('incident_id')`
+- `trg_incident_complaint_lock`: `BEFORE INSERT ... incident_complaint_lock()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 
@@ -585,8 +600,11 @@ Contractor invoice for a job.
 
 **Triggers**
 
+- `trg_00_invoice_insert_isolation`: `BEFORE INSERT ... require_read_committed_financialrace()`
+- `trg_00_invoice_status_isolation`: `BEFORE UPDATE OF status ... require_read_committed_financialrace()`
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('invoice_id')`
 - `trg_invoice_auto_hold`: `AFTER INSERT ... invoice_auto_hold()`
+- `trg_invoice_complaint_lock`: `BEFORE INSERT ... invoice_complaint_lock()`
 - `trg_invoice_guard`: `BEFORE UPDATE ... invoice_guard()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
@@ -637,7 +655,9 @@ Reason an invoice cannot be approved or paid, with provenance.
 
 **Triggers**
 
+- `trg_00_invoice_hold_insert_isolation`: `BEFORE INSERT ... require_read_committed_financialrace()`
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('hold_id')`
+- `trg_invoice_hold_guard`: `BEFORE INSERT ... invoice_hold_guard()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 
@@ -681,6 +701,7 @@ Work order for a complaint, assigned to a contractor.
 **Triggers**
 
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('job_id')`
+- `trg_job_contractor_safety_revalidate`: `AFTER UPDATE OF contractor_id ... revalidate_changed_safety_dependency()`
 - `trg_job_insert_guard`: `BEFORE INSERT ... job_insert_guard()`
 - `trg_job_method_guard`: `BEFORE UPDATE OF method ... job_method_guard()`
 
@@ -708,6 +729,34 @@ Titles and legal references for each entry-gate clause.
 | Primary key | `legal_clause_pkey` | `PRIMARY KEY (clause_code)` |
 | Unique | `legal_clause_sort_order_key` | `UNIQUE (sort_order)` |
 | Check | `legal_clause_clause_code_check` | `CHECK ((clause_code = upper(clause_code)))` |
+
+## legal_clause_source
+
+One or more classified source/applicability records for each entry checklist clause.
+
+| Column | Type | Null? | Default |
+|---|---|---|---|
+| `clause_code` | text | NOT NULL |  |
+| `source_code` | text | NOT NULL |  |
+| `sort_order` | smallint | NOT NULL |  |
+
+**Constraints**
+
+| Kind | Name | Definition |
+|---|---|---|
+| Primary key | `legal_clause_source_pkey` | `PRIMARY KEY (clause_code, source_code)` |
+| Unique | `legal_clause_source_clause_code_sort_order_key` | `UNIQUE (clause_code, sort_order)` |
+| Foreign key | `legal_clause_source_clause_code_fkey` | `FOREIGN KEY (clause_code) REFERENCES legal_clause(clause_code)` |
+| Foreign key | `legal_clause_source_source_code_fkey` | `FOREIGN KEY (source_code) REFERENCES policy_source(source_code)` |
+| Check | `legal_clause_source_sort_order_check` | `CHECK ((sort_order > 0))` |
+
+**Triggers**
+
+- `trg_legal_clause_source_immutable`: `BEFORE DELETE OR UPDATE ... immutable_policy_record()`
+
+**Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
+
+- `rls_select` for SELECT: USING `true`
 
 ## machine
 
@@ -745,6 +794,7 @@ A machine used on a job and its outcome (clearance evidence).
 | `outcome` | text | nullable |  |
 | `recorded_by` | bigint | nullable |  |
 | `recorded_at` | timestamp with time zone | NOT NULL | `now()` |
+| `outcome_recorded_at` | timestamp with time zone | nullable |  |
 
 **Constraints**
 
@@ -756,15 +806,18 @@ A machine used on a job and its outcome (clearance evidence).
 | Foreign key | `machine_deployment_recorded_by_fkey` | `FOREIGN KEY (recorded_by) REFERENCES app_user(user_id)` |
 | Check | `ck_deployment_order` | `CHECK (((ended_at IS NULL) OR (ended_at >= started_at)))` |
 | Check | `ck_deployment_outcome_matches_end` | `CHECK (((ended_at IS NULL) = (outcome IS NULL)))` |
+| Check | `ck_deployment_unfinished_has_no_outcome_receipt` | `CHECK (((outcome IS NOT NULL) OR (outcome_recorded_at IS NULL)))` |
 | Check | `machine_deployment_outcome_check` | `CHECK ((outcome = ANY (ARRAY['CLEARED'::text, 'FAILED'::text])))` |
 
 **Indexes** (beyond those that back the constraints above)
 
+- `ix_deployment_cleared_receipt`: `btree (job_id, outcome_recorded_at) WHERE ((outcome = 'CLEARED'::text) AND (outcome_recorded_at IS NOT NULL))`
 - `ix_deployment_job_outcome`: `btree (job_id, outcome)`
 
 **Triggers**
 
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('deploy_id')`
+- `trg_machine_deployment_outcome_guard`: `BEFORE INSERT OR UPDATE ... machine_deployment_outcome_guard()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 
@@ -844,6 +897,41 @@ Written reason, approved by the RSA, why a machine cannot do the job.
    FROM job j
   WHERE ((j.job_id = mechanisation_waiver.job_id) AND (j.contractor_id = app_contractor_id())))))`
 
+## permit_authorization_decision
+
+Immutable database-created JSONB snapshot for each successful authorization transition; not a formal proof or owner-resistant signature.
+
+| Column | Type | Null? | Default |
+|---|---|---|---|
+| `decision_id` | bigint | NOT NULL | `generated always as identity` |
+| `permit_id` | bigint | NOT NULL |  |
+| `decision_kind` | text | NOT NULL |  |
+| `decision_at` | timestamp with time zone | NOT NULL |  |
+| `actor_user_id` | bigint | NOT NULL |  |
+| `snapshot_format` | smallint | NOT NULL | `1` |
+| `snapshot` | jsonb | NOT NULL |  |
+| `snapshot_sha256` | text | NOT NULL |  |
+| `captured_at` | timestamp with time zone | NOT NULL | `clock_timestamp()` |
+
+**Constraints**
+
+| Kind | Name | Definition |
+|---|---|---|
+| Primary key | `permit_authorization_decision_pkey` | `PRIMARY KEY (decision_id)` |
+| Unique | `permit_authorization_decision_permit_id_key` | `UNIQUE (permit_id)` |
+| Foreign key | `permit_authorization_decision_permit_id_fkey` | `FOREIGN KEY (permit_id) REFERENCES entry_permit(permit_id) ON DELETE RESTRICT` |
+| Check | `permit_authorization_decision_decision_kind_check` | `CHECK ((decision_kind = 'AUTHORIZATION'::text))` |
+| Check | `permit_authorization_decision_snapshot_format_check` | `CHECK ((snapshot_format = 1))` |
+| Check | `permit_authorization_decision_snapshot_sha256_check` | `CHECK ((snapshot_sha256 ~ '^[0-9a-f]{64}$'::text))` |
+
+**Triggers**
+
+- `trg_permit_authorization_decision_immutable`: `BEFORE DELETE OR UPDATE ... immutable_policy_record()`
+
+**Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
+
+- `rls_select` for SELECT: USING `(app_is_staff() OR worker_on_permit(permit_id) OR contractor_owns_permit(permit_id))`
+
 ## permit_crew
 
 Crew of a permit with exactly one role per worker.
@@ -878,6 +966,72 @@ Crew of a permit with exactly one role per worker.
 - `rls_insert` for INSERT:  WITH CHECK `(app_has_role(VARIADIC '{SUPERVISOR}'::text[]) AND permit_writer(permit_id))`
 - `rls_select` for SELECT: USING `(app_is_staff() OR worker_on_permit(permit_id) OR contractor_owns_permit(permit_id))`
 - `rls_update` for UPDATE: USING `(app_has_role(VARIADIC '{SUPERVISOR}'::text[]) AND permit_writer(permit_id))` WITH CHECK `(app_has_role(VARIADIC '{SUPERVISOR}'::text[]) AND permit_writer(permit_id))`
+
+## permit_safety_event
+
+Append-only local safety event evidence; it does not assert external delivery.
+
+| Column | Type | Null? | Default |
+|---|---|---|---|
+| `event_id` | bigint | NOT NULL | `generated always as identity` |
+| `permit_id` | bigint | NOT NULL |  |
+| `entry_id` | bigint | nullable |  |
+| `event_key` | text | NOT NULL |  |
+| `event_type` | text | NOT NULL |  |
+| `reason_code` | text | NOT NULL |  |
+| `detail` | jsonb | NOT NULL | `'{}'::jsonb` |
+| `occurred_at` | timestamp with time zone | NOT NULL | `clock_timestamp()` |
+
+**Constraints**
+
+| Kind | Name | Definition |
+|---|---|---|
+| Primary key | `permit_safety_event_pkey` | `PRIMARY KEY (event_id)` |
+| Unique | `permit_safety_event_event_key_key` | `UNIQUE (event_key)` |
+| Foreign key | `permit_safety_event_entry_id_fkey` | `FOREIGN KEY (entry_id) REFERENCES entry_log(entry_id) DEFERRABLE INITIALLY DEFERRED` |
+| Foreign key | `permit_safety_event_permit_id_fkey` | `FOREIGN KEY (permit_id) REFERENCES entry_permit(permit_id)` |
+| Check | `permit_safety_event_event_key_check` | `CHECK ((length(btrim(event_key)) > 0))` |
+| Check | `permit_safety_event_event_type_check` | `CHECK ((event_type = ANY (ARRAY['PERMIT_ABORTED'::text, 'SAFETY_STOP'::text, 'OPEN_ENTRY_OVERSTAY'::text, 'EXIT_VIOLATION'::text])))` |
+| Check | `permit_safety_event_reason_code_check` | `CHECK ((reason_code = upper(reason_code)))` |
+
+**Triggers**
+
+- `trg_append_only`: `BEFORE DELETE OR UPDATE ... forbid_change()`
+- `trg_audit`: `AFTER INSERT ... audit_row('event_id')`
+
+**Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
+
+- `rls_select` for SELECT: USING `(app_is_staff() OR worker_on_permit(permit_id) OR contractor_owns_permit(permit_id))`
+
+## policy_source
+
+Migration-managed source metadata; source type distinguishes law, court directions, guidance and product policy.
+
+| Column | Type | Null? | Default |
+|---|---|---|---|
+| `source_code` | text | NOT NULL |  |
+| `source_type` | text | NOT NULL |  |
+| `title` | text | NOT NULL |  |
+| `source_url` | text | nullable |  |
+| `source_version` | text | NOT NULL |  |
+| `citation_clause` | text | NOT NULL |  |
+| `applicability` | text | NOT NULL |  |
+
+**Constraints**
+
+| Kind | Name | Definition |
+|---|---|---|
+| Primary key | `policy_source_pkey` | `PRIMARY KEY (source_code)` |
+| Check | `policy_source_source_code_check` | `CHECK ((source_code ~ '^[A-Z0-9_]+$'::text))` |
+| Check | `policy_source_source_type_check` | `CHECK ((source_type = ANY (ARRAY['LAW'::text, 'COURT_DIRECTION'::text, 'GUIDANCE'::text, 'PRODUCT_POLICY'::text])))` |
+
+**Triggers**
+
+- `trg_policy_source_immutable`: `BEFORE DELETE OR UPDATE ... immutable_policy_record()`
+
+**Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
+
+- `rls_select` for SELECT: USING `true`
 
 ## resolution_type
 
@@ -928,23 +1082,67 @@ Statutory thresholds and policy numbers as editable, audited data.
 | `is_assumption` | boolean | NOT NULL | `false` |
 | `updated_by` | bigint | nullable |  |
 | `updated_at` | timestamp with time zone | NOT NULL | `now()` |
+| `revision` | integer | NOT NULL | `1` |
+| `source_code` | text | NOT NULL |  |
 
 **Constraints**
 
 | Kind | Name | Definition |
 |---|---|---|
 | Primary key | `rule_parameter_pkey` | `PRIMARY KEY (param_key)` |
+| Foreign key | `rule_parameter_source_code_fkey` | `FOREIGN KEY (source_code) REFERENCES policy_source(source_code)` |
 | Foreign key | `rule_parameter_updated_by_fkey` | `FOREIGN KEY (updated_by) REFERENCES app_user(user_id)` |
 | Check | `rule_parameter_param_key_check` | `CHECK ((param_key ~ '^[a-z0-9_]+$'::text))` |
+| Check | `rule_parameter_revision_check` | `CHECK ((revision > 0))` |
 
 **Triggers**
 
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('param_key')`
+- `trg_rule_parameter_revision`: `BEFORE UPDATE ... record_rule_parameter_revision()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 
 - `rls_select` for SELECT: USING `true`
 - `rls_update` for UPDATE: USING `app_has_role(VARIADIC '{ADMIN}'::text[])` WITH CHECK `app_has_role(VARIADIC '{ADMIN}'::text[])`
+
+## rule_parameter_history
+
+Append-only current-value change history with actor/reason/source; not a historical rule-replay engine.
+
+| Column | Type | Null? | Default |
+|---|---|---|---|
+| `history_id` | bigint | NOT NULL | `generated always as identity` |
+| `param_key` | text | NOT NULL |  |
+| `revision` | integer | NOT NULL |  |
+| `value` | numeric | NOT NULL |  |
+| `unit` | text | NOT NULL |  |
+| `description` | text | NOT NULL |  |
+| `legal_ref` | text | NOT NULL |  |
+| `is_assumption` | boolean | NOT NULL |  |
+| `source_code` | text | NOT NULL |  |
+| `effective_at` | timestamp with time zone | NOT NULL |  |
+| `actor_user_id` | bigint | nullable |  |
+| `change_reason` | text | NOT NULL |  |
+| `recorded_at` | timestamp with time zone | NOT NULL | `clock_timestamp()` |
+
+**Constraints**
+
+| Kind | Name | Definition |
+|---|---|---|
+| Primary key | `rule_parameter_history_pkey` | `PRIMARY KEY (history_id)` |
+| Unique | `rule_parameter_history_param_key_revision_key` | `UNIQUE (param_key, revision)` |
+| Foreign key | `rule_parameter_history_param_key_fkey` | `FOREIGN KEY (param_key) REFERENCES rule_parameter(param_key) ON DELETE RESTRICT` |
+| Foreign key | `rule_parameter_history_source_code_fkey` | `FOREIGN KEY (source_code) REFERENCES policy_source(source_code)` |
+| Check | `rule_parameter_history_change_reason_check` | `CHECK ((length(btrim(change_reason)) >= 10))` |
+| Check | `rule_parameter_history_revision_check` | `CHECK ((revision > 0))` |
+
+**Triggers**
+
+- `trg_rule_parameter_history_immutable`: `BEFORE DELETE OR UPDATE ... immutable_policy_record()`
+
+**Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
+
+- `rls_select` for SELECT: USING `true`
 
 ## shadow_entry_alert
 
@@ -984,8 +1182,10 @@ Persisted suspicion that an entry happened unrecorded.
 
 **Triggers**
 
+- `trg_00_alert_insert_isolation`: `BEFORE INSERT ... require_read_committed_financialrace()`
 - `trg_alert_after_insert`: `AFTER INSERT ... alert_after_insert()`
 - `trg_alert_after_update`: `AFTER UPDATE ... alert_after_update()`
+- `trg_alert_complaint_lock`: `BEFORE INSERT ... alert_complaint_lock()`
 - `trg_alert_guard`: `BEFORE UPDATE ... alert_guard()`
 - `trg_no_delete`: `BEFORE DELETE ... forbid_change()`
 
@@ -1107,6 +1307,7 @@ Sanitation worker registered under NAMASTE.
 **Triggers**
 
 - `trg_audit`: `AFTER INSERT OR DELETE OR UPDATE ... audit_row('worker_id')`
+- `trg_worker_safety_revalidate`: `AFTER UPDATE OF is_active, medical_fit_until, trained_until, contractor_id ... revalidate_changed_safety_dependency()`
 
 **Row-level security** is ENABLED (the table owner and superusers bypass it; the application role does not)
 

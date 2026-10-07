@@ -319,10 +319,17 @@ def _closed_permit_with_entries(conn, f, logged, *, log_recorded_at=None, resolv
     s = f.gate_scenario(yesterday_ist(10, 0))
     conn.execute("SELECT * FROM authorise_entry(%s, %s, %s)", (s["permit"], s["supervisor"], s["at"]))
     for i, who in enumerate(logged):
-        conn.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by, recorded_at) "
-                     "VALUES (%s, %s, tstzrange(%s, %s), %s, %s)",
-                     (s["permit"], s[who], s["at"] + (10 + 60 * i) * H / 60, s["at"] + (40 + 60 * i) * H / 60, s["supervisor"],
-                      log_recorded_at or s["at"] + H))
+        entry_id = conn.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by) "
+                                "VALUES (%s, %s, tstzrange(%s, %s), %s) RETURNING entry_id",
+                                (s["permit"], s[who], s["at"] + (10 + 60 * i) * H / 60,
+                                 s["at"] + (40 + 60 * i) * H / 60, s["supervisor"])).fetchone()["entry_id"]
+        # Model an imported historical receipt only inside this owner-only test fixture. Live inserts always
+        # stamp `recorded_at` at the database clock; a client cannot backdate timely evidence.
+        with conn.transaction():
+            conn.execute("ALTER TABLE entry_log DISABLE TRIGGER trg_entry_log_guard")
+            conn.execute("UPDATE entry_log SET recorded_at = %s WHERE entry_id = %s",
+                         (log_recorded_at or s["at"] + H, entry_id))
+            conn.execute("ALTER TABLE entry_log ENABLE TRIGGER trg_entry_log_guard")
     s["closed_at"] = s["at"] + 3 * H
     conn.execute("UPDATE entry_permit SET status = 'CLOSED', ended_at = %s WHERE permit_id = %s", (s["closed_at"], s["permit"]))
     if resolved:   # resolved with the permit as evidence, so only SE2 is in play

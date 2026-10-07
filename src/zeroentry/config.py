@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     seed_user_password: str | None = None
     app_db_password: str | None = None            # only read by `scripts/db.py bootstrap`, never by the running app
+    safety_sweep_interval_seconds: int = Field(30, ge=0, le=3600)  # 0: external scheduler owns maintenance
 
     @model_validator(mode="after")
     def _production_must_be_hardened(self) -> "Settings":
