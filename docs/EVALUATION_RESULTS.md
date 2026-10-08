@@ -4,11 +4,11 @@
 
 | Run | |
 |---|---|
-| Date | 2026-10-08 01:25 UTC |
+| Date | 2026-10-08 01:30 UTC |
 | Command | `python scripts/evaluate.py --sizes 1000,10000 --per-class 20 --timeout 15 --out docs/EVALUATION_RESULTS.md` |
-| Commit | `1876ffa` |
-| Dirty tree | True |
-| Source SHA-256 | 97e55be1c0bf21968b569c78c865f1c543dd43d38535404568e4305ef7b46301 |
+| Commit | `f68bbfa` |
+| Dirty tree | False |
+| Source SHA-256 | 0240705c066dddbea5cc5d0f2c452b2e5a6eaeda022071a9ec6c9af608504a06 |
 | Schema revision | 0016 |
 | Machine | Windows 10, 16 logical CPUs, AMD64 |
 | Python / PostgreSQL | 3.12.14 / 16.2 (embedded, default settings) |
@@ -39,9 +39,9 @@ ZeroEntry = alerts persisted by `scan_shadow_entries()`; naive = the proposal's 
 
 ## E2 Enforcement (one invalid write per rule, any client)
 
-Baseline = the same schema and constraints with every rule trigger disabled (`database/evaluation/rules_in_app_code.sql`): the rules live in application code, so any other client (a script, a second app, a SQL console, a buggy endpoint) would not run those checks.
+Comparator = the same schema and constraints with every rule trigger disabled (`database/evaluation/rules_in_app_code.sql`). This is an unguarded-database ablation isolating the contribution of rule triggers, not an implemented application validator or a commercial-product comparison.
 
-| Rule | Invalid write | ZeroEntry | Baseline (rules in app code) |
+| Rule | Invalid write | ZeroEntry | Unguarded-database ablation |
 |---|---|---|---|
 | BR-01 | Draft a permit for a job that has no written mechanisation waiver | refused, `ZE002`: No entry permit without a written mechanisation waiver for the job (mechanised cleaning comes first) | **accepted** |
 | BR-02 | File a MACHINE_FAILED waiver when no machine has failed on the complaint | refused, `ZE002`: Reason MACHINE_FAILED needs a recorded FAILED machine deployment for this complaint | **accepted** |
@@ -52,7 +52,7 @@ Baseline = the same schema and constraints with every rule trigger disabled (`da
 | BR-07 | Authorise after the latest BOTTOM reading showed H2S at 25 ppm | refused, `ZE001`: Entry denied by current evidence gates: GAS_BOTTOM | **accepted** |
 | BR-08 | Insert a permit that is born AUTHORISED | refused, `ZE003`: A permit is created as DRAFT; AUTHORISED is reachable only through the clause gate | **accepted** |
 | BR-09 | Add an un-geared entrant to an authorised permit | refused, `ZE003`: Crew and gear are frozen once a permit is AUTHORISED (cancel and re-issue instead) | **accepted** |
-| BR-10 | Start a new entry before the required 30-minute rest after a 90-minute stretch | refused, `ZE002`: This worker must rest for 30 minutes after a 90-minute stretch; the next stretch is allowed after 2026-10-08 07:24 IST | **accepted** |
+| BR-10 | Start a new entry before the required 30-minute rest after a 90-minute stretch | refused, `ZE002`: This worker must rest for 30 minutes after a 90-minute stretch; the next stretch is allowed after 2026-10-08 07:29 IST | **accepted** |
 | BR-11 | Re-open a CLOSED permit | refused, `ZE003`: A permit cannot change from CLOSED to AUTHORISED | **accepted** |
 | BR-12 | Record a gas reading from a detector whose calibration had lapsed | refused, `ZE002`: Detector GD-T-01389 calibration expired on 2020-01-01 for observation date 2026-09-01 | **accepted** |
 | BR-22 | Give a new job to a blacklisted contractor | refused, `ZE003`: Contractor Contractor 1391 is BLACKLISTED and cannot be assigned jobs | **accepted** |
@@ -74,12 +74,12 @@ Every measurement is rolled back, so each repetition does the same work. Times i
 
 | Complaints | Permits | Gas readings | Decision median | Decision p95 | Without gate indexes (median) | Clause check buffers |
 |---|---|---|---|---|---|---|
-| 1,001 | 51 | 153 | 7.2 | 8.2 | 7.0 | 194 |
-| 10,001 | 501 | 1,503 | 7.3 | 9.7 | 9.7 | 227 |
+| 1,001 | 51 | 153 | 8.2 | 8.7 | 8.0 | 194 |
+| 10,001 | 501 | 1,503 | 6.9 | 8.1 | 9.4 | 227 |
 
 ### E3b Detection by absence (`scan_shadow_entries()` and the candidate query)
 
 | Complaints | Scan median / p95 | Scan before 0011 (median) | Candidate query ms / buffers | Before 0011 | Without scan indexes | Naive query ms / buffers | Naive flagged | ZeroEntry candidates |
 |---|---|---|---|---|---|---|---|---|
-| 1,001 | 4.5 / 4.7 | 61.7 | 3.0 / 594 | 10.2 / 1,574 | 7.3 / 1,146 | 0.7 / 63 | 48 | 19 |
-| 10,001 | 42.3 / 49.2 | 182.9 | 13.7 / 7,003 | 58.5 / 16,509 | 276.8 / 86,923 | 4.4 / 621 | 476 | 190 |
+| 1,001 | 4.5 / 5.2 | 19.2 | 1.9 / 594 | 7.5 / 1,574 | 3.8 / 1,146 | 0.4 / 63 | 48 | 19 |
+| 10,001 | 41.7 / 44.2 | 166.4 | 11.4 / 7,003 | 95.1 / 16,509 | 275.4 / 86,923 | 3.7 / 621 | 476 | 190 |
