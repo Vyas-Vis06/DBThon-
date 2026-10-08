@@ -18,7 +18,8 @@ educational simulations. Show acknowledgement, retained receipt, safety stop and
 standalone two-victim intake and LAB proof.
 
 Verified: **617 passing local tests**, no failures/errors/skips, three real-browser scenarios; 50 application tables,
-97 FKs and 16 migrations. All six LAB areas have actual evidence in [current.json](../evidence/current.json).
+97 FKs and 16 migrations. The independently installed wheel also passed all six static page/asset smoke checks.
+All six LAB areas have actual evidence in [current.json](../evidence/current.json).
 See [restore](../evidence/restore.json), [equal-policy interleaving](../evidence/preview.json),
 [E1-E3 measurements](../EVALUATION_RESULTS.md), [temporal results](../evaluation/RESULTS.md),
 [rubric mapping](../SUBMISSION.md) and [integration guide](INTEGRATION_GUIDE.md).

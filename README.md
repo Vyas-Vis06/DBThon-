@@ -118,6 +118,10 @@ contribution, evaluation limits and demonstration sequence.
 
 ## Before presenting
 
+Start with the [ZE2 release handoff](docs/development/ZE2_RELEASE.md) and the
+[current four-to-five-minute rehearsal](docs/development/DEMO_SCRIPT.md). The integrated tree has 617 passing local
+tests, including three browser scenarios; local results do not certify field safety or remote CI.
+
 * Selected clauses have source/classification/applicability records. The configured gate is not a complete legal checklist.
   Avoid unreverified headline death statistics. Sources and assumptions are in
   [PROJECT_SPEC.md](PROJECT_SPEC.md) and [POLICY_AND_PRIOR_ART.md](docs/POLICY_AND_PRIOR_ART.md).

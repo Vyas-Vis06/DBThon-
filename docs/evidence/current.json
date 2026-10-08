@@ -1,13 +1,13 @@
 {
-  "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-  "measured_at": "2026-10-07T18:27:25.864861+00:00",
-  "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+  "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+  "measured_at": "2026-10-08T01:24:52.152671+00:00",
+  "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
   "dirty": true,
   "schema_revision": "0016",
   "source_sha256": "97e55be1c0bf21968b569c78c865f1c543dd43d38535404568e4305ef7b46301",
   "machine": "Windows-10-10.0.19045-SP0",
   "python": "3.12.14",
-  "junit_report": "C:/Users/Soham/Documents/Codex/2026-10-07/how/zeroentry-integrated/.reports/integration.xml",
+  "junit_report": ".reports/integration.xml",
   "verification": {
     "source_sha256": "97e55be1c0bf21968b569c78c865f1c543dd43d38535404568e4305ef7b46301",
     "pytest_exit_code": 0,
@@ -30,9 +30,9 @@
       "artifact_path": "database/migrations/sql/0002_core_schema.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "21 passing test cases reference this proof"
     },
     {
@@ -41,9 +41,9 @@
       "artifact_path": "database/seeds",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "6 passing test cases reference this proof"
     },
     {
@@ -52,9 +52,9 @@
       "artifact_path": "tests/db/test_schema.py",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "21 passing test cases reference this proof"
     },
     {
@@ -63,9 +63,9 @@
       "artifact_path": "tests/db/test_schema.py",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "21 passing test cases reference this proof"
     },
     {
@@ -74,9 +74,9 @@
       "artifact_path": "database/queries/05_views_functions_procedures.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "1 passing test cases reference this proof"
     },
     {
@@ -85,9 +85,9 @@
       "artifact_path": "database/queries/02_aggregates.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "1 passing test cases reference this proof"
     },
     {
@@ -96,9 +96,9 @@
       "artifact_path": "database/queries/01_joins.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "1 passing test cases reference this proof"
     },
     {
@@ -107,9 +107,9 @@
       "artifact_path": "database/queries/04_division_and_anti_join.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "1 passing test cases reference this proof"
     },
     {
@@ -118,9 +118,9 @@
       "artifact_path": "database/queries/05_views_functions_procedures.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "1 passing test cases reference this proof"
     },
     {
@@ -129,9 +129,9 @@
       "artifact_path": "tests/db/test_entry_gate.py",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "43 passing test cases reference this proof"
     },
     {
@@ -140,9 +140,9 @@
       "artifact_path": "tests/db/test_consequences.py",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "17 passing test cases reference this proof"
     },
     {
@@ -151,9 +151,9 @@
       "artifact_path": "database/queries/07_trigger_refusals.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "1 passing test cases reference this proof"
     },
     {
@@ -162,9 +162,9 @@
       "artifact_path": "database/queries/08_cursor_and_assertion_lab.sql",
       "status": "TESTED",
       "url": null,
-      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
-      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
-      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "run_id": "d1836353-8ecc-4395-91f9-991345b1775b",
+      "git_sha": "1876ffa6acedfa10bab97a53c55a3085cf338416",
+      "measured_at": "2026-10-08T01:24:52.152671+00:00",
       "summary": "1 passing test cases reference this proof"
     }
   ],

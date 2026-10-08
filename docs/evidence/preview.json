@@ -1,6 +1,6 @@
 {
   "experiment": "E5 controlled application-preview/write interleaving",
-  "recorded_at": "2026-10-07T18:21:55.859314+00:00",
+  "recorded_at": "2026-10-08T01:24:41.007785+00:00",
   "machine": "Windows-10-10.0.19045-SP0",
   "python": "3.12.14",
   "postgresql": "16.2",
