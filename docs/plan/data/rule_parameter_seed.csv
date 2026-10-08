@@ -1,0 +1,34 @@
+profile_code,parameter_code,kind,scope,numeric_value,text_value,gear_code,quantity,unit,source_key,source_category,gate,comparison,applicability,notes
+EDU_LAB_V1,CREW_MIN,LIMIT,PERMIT,3,,,1,people,MSR2013_R6_3_A,RULE,G4,>=,REFERENCE_TEXT_ONLY,Text transcribed; current applicability pending; no real ALLOW policy.
+EDU_LAB_V1,O2_MIN,LIMIT,PERMIT,19.5,,,1,pct,MSR2013_R6_3_P,RULE,G2,>=,REFERENCE_TEXT_ONLY,Rule source reference; numeric profile remains educational until jurisdiction review.
+EDU_LAB_V1,O2_MAX,LIMIT,PERMIT,21,,,1,pct,MSR2013_R6_3_P,RULE,G2,<=,REFERENCE_TEXT_ONLY,Rule source reference; numeric profile remains educational until jurisdiction review.
+EDU_LAB_V1,REQUIRED_DEPTH_TOP,DEPTH,PERMIT,,TOP,,1,location,MSR2013_R6_3_P,RULE,G2,REQUIRED,REFERENCE_TEXT_ONLY,Three-depth sampling source reference.
+EDU_LAB_V1,REQUIRED_DEPTH_MID,DEPTH,PERMIT,,MID,,1,location,MSR2013_R6_3_P,RULE,G2,REQUIRED,REFERENCE_TEXT_ONLY,Three-depth sampling source reference.
+EDU_LAB_V1,REQUIRED_DEPTH_BOTTOM,DEPTH,PERMIT,,BOTTOM,,1,location,MSR2013_R6_3_P,RULE,G2,REQUIRED,REFERENCE_TEXT_ONLY,Three-depth sampling source reference.
+EDU_LAB_V1,GAS_FRESHNESS_SECONDS,LIMIT,PERMIT,900,,,1,seconds,OP_DEMO,OPERATIONAL_DEMO,G2,<=,DEMO_ONLY,Educational sampling freshness assumption.
+EDU_LAB_V1,FUTURE_CLOCK_SKEW_SECONDS,LIMIT,PERMIT,120,,,1,seconds,OP_DEMO,OPERATIONAL_DEMO,G2,<=,DEMO_ONLY,Educational timestamp tolerance; source timestamps remain evidence.
+EDU_LAB_V1,H2S_MAX_PPM,LIMIT,PERMIT,10,,,1,ppm,OP_DEMO,OPERATIONAL_DEMO,G2,<,DEMO_ONLY,"Strictly below 10 ppm; extra team-selected operator, not asserted statutory threshold."
+EDU_LAB_V1,LEL_MAX_PCT,LIMIT,PERMIT,10,,,1,pct,OP_DEMO,OPERATIONAL_DEMO,G2,<,DEMO_ONLY,Strictly below 10 percent; extra team-selected operator.
+EDU_LAB_V1,CO_MAX_PPM,LIMIT,PERMIT,25,,,1,ppm,OP_DEMO,OPERATIONAL_DEMO,G2,<,DEMO_ONLY,"Strictly below 25 ppm; extra team-selected operator, not asserted statutory threshold."
+EDU_LAB_V1,STRETCH_MAX_MINUTES,LIMIT,PERMIT,90,,,1,minutes,MSR2013_R6_3_K,RULE,G6,<=,REFERENCE_TEXT_ONLY,Verified text reference; live rule applicability pending.
+EDU_LAB_V1,REST_MINUTES,LIMIT,PERMIT,30,,,1,minutes,MSR2013_R6_3_K,RULE,G6,>=,REFERENCE_TEXT_ONLY,Verified text reference; live rule applicability pending.
+EDU_LAB_V1,GEAR_CHECK_MONTHS,LIMIT,PERMIT,6,,,1,calendar_months,MSR2013_R6_1,RULE,G1,<=,REFERENCE_TEXT_ONLY,Calendar-month interval reference; do not convert to fixed days.
+EDU_LAB_V1,TRAINING_VALIDITY_YEARS,LIMIT,ENTRANT,2,,,1,years,MSR2013_R6_3_I,RULE,G7,<=,REFERENCE_TEXT_ONLY,Text interval reference; covered training and applicability pending review.
+EDU_LAB_V1,OPERATING_START,LIMIT,PERMIT,0,,,1,local_hour,OP_DEMO,OPERATIONAL_DEMO,G6,>=,DEMO_ONLY,"Educational full-day window 0..24; daylight source clause Rule 6(3)(k)(i) is not implemented by this profile."
+EDU_LAB_V1,OPERATING_END,LIMIT,PERMIT,24,,,1,local_hour,OP_DEMO,OPERATIONAL_DEMO,G6,<,DEMO_ONLY,"Educational full-day window 0..24; daylight source clause Rule 6(3)(k)(i) is not implemented by this profile."
+EDU_LAB_V1,PERSONAL_GEAR_GEAR_R4_02,GEAR,ENTRANT,,,GEAR_R4_02,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,PERSONAL_GEAR_GEAR_R4_19,GEAR,ENTRANT,,,GEAR_R4_19,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,PERSONAL_GEAR_GEAR_R4_21,GEAR,ENTRANT,,,GEAR_R4_21,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,PERSONAL_GEAR_GEAR_R4_23,GEAR,ENTRANT,,,GEAR_R4_23,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,PERSONAL_GEAR_GEAR_R4_37,GEAR,ENTRANT,,,GEAR_R4_37,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,PERSONAL_GEAR_GEAR_R4_39,GEAR,ENTRANT,,,GEAR_R4_39,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,SITE_GEAR_GEAR_R4_15,GEAR,SITE,,,GEAR_R4_15,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,SITE_GEAR_GEAR_R4_17,GEAR,SITE,,,GEAR_R4_17,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,SITE_GEAR_GEAR_R4_43,GEAR,SITE,,,GEAR_R4_43,1,item,OP_DEMO,OPERATIONAL_DEMO,G1,REQUIRED,DEMO_ONLY,Catalogue item selected for demo only; code-to-UUID mapping by loader.
+EDU_LAB_V1,READINESS_STRUCTURE,READINESS,PERMIT,,STRUCTURE,,1,status,OP_DEMO,OPERATIONAL_DEMO,G7,REQUIRED,DEMO_ONLY,Selected educational attestation; does not certify physical structure.
+EDU_LAB_V1,READINESS_ISOLATION,READINESS,PERMIT,,ISOLATION,,1,status,OP_DEMO,OPERATIONAL_DEMO,G7,REQUIRED,DEMO_ONLY,Selected educational attestation; does not certify physical isolation.
+EDU_LAB_V1,READINESS_VENTILATION,READINESS,PERMIT,,VENTILATION,,1,status,OP_DEMO,OPERATIONAL_DEMO,G7,REQUIRED,DEMO_ONLY,Selected educational attestation; does not certify physical conditions.
+EDU_LAB_V1,READINESS_RESCUE,READINESS,PERMIT,,RESCUE,,1,status,OP_DEMO,OPERATIONAL_DEMO,G7,REQUIRED,DEMO_ONLY,Selected educational attestation; not proof rescue capability exists.
+EDU_LAB_V1,READINESS_COMMUNICATION,READINESS,PERMIT,,COMMUNICATION,,1,status,OP_DEMO,OPERATIONAL_DEMO,G7,REQUIRED,DEMO_ONLY,Selected educational attestation; does not certify working communications.
+EDU_LAB_V1,READINESS_TRAFFIC,READINESS,PERMIT,,TRAFFIC,,1,status,OP_DEMO,OPERATIONAL_DEMO,G7,REQUIRED,DEMO_ONLY,Selected educational attestation; does not certify traffic controls.
+EDU_LAB_V1,READINESS_MEDICAL,READINESS,PERMIT,,MEDICAL,,1,status,OP_DEMO,OPERATIONAL_DEMO,G7,REQUIRED,DEMO_ONLY,Selected educational attestation; does not certify medical readiness.

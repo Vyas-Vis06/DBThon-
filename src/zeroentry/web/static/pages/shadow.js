@@ -4,9 +4,9 @@ const short = (s, n = 90) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
 export default async function (root) {
   const decider = isRole('ADMIN', 'ENGINEER');
-  root.append(h('h1', {}, 'Shadow-entry detection by absence'),
+  root.append(h('h1', {}, 'Shadow-entry evidence review'),
     h('div', { class: 'panel' },
-      h('p', {}, 'A shadow entry is a human entry nobody recorded. It cannot be seen directly, so the database looks for the records that a lawful clearance would have left behind.'),
+      h('p', {}, 'A shadow-entry alert is a suspicion for human review. The database looks for expected clearance records that are absent; a missing row alone does not prove an entry, an offence, or misconduct.'),
       h('ul', {},
         h('li', {}, h('strong', {}, 'SE1:'), ' a complaint closed as “cleared” with no machine clearance and no authorised, closed permit with a logged entry, recorded within the grace window.'),
         h('li', {}, h('strong', {}, 'SE2:'), ' a closed permit with an entrant who has no entry log.')),

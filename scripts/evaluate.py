@@ -9,7 +9,7 @@ database), migrates it through the normal Alembic path and runs three experiment
 
   E1  detection accuracy   scan_shadow_entries() vs the proposal's naive anti-join, on labelled synthetic complaints
   E2  enforcement          one invalid write per database-enforced rule, against ZeroEntry and against the same schema
-                           with its rule triggers disabled (the rules living in application code)
+                           with its rule triggers disabled (controlled unguarded-database ablation, not a full validator)
   E3  performance          entry-decision latency and absence-scan cost as history grows, with and without the indexes
 
 tests/db/test_evaluation.py runs E1-E3 at a tiny scale and asserts the counts (never the timings).
@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from tests.factories import Factory, ist  # noqa: E402  (row factories that go through every constraint and trigger)
+from zeroentry.evidence import source_fingerprint
 
 EVAL_SQL = ROOT / "database" / "evaluation" / "evaluation.sql"
 BASELINE_SQL = ROOT / "database" / "evaluation" / "rules_in_app_code.sql"
@@ -242,14 +243,14 @@ def _noop(conn, f, s):
 
 def _prepare_short_rest(conn, f: Factory, s: dict) -> None:
     """Set up a valid current permit with a recent, recorded 90-minute stretch by the same entrant."""
-    _authorise_raw(conn, s)
-
     prior_at = s["at"] - 2 * H
     prior_permit = f.permit(s["job"], s["supervisor"])
     for name, role in (("e1", "ENTRANT"), ("e2", "ENTRANT"), ("standby", "STANDBY"), ("sup_worker", "SUPERVISOR")):
-        f.crew(prior_permit, s[name], role)
+        f.crew(prior_permit, s[name], role, acknowledged_at=prior_at-2*MIN)
     for name in ("e1", "e2"):
         f.issue_gear(prior_permit, s[name], s["supervisor"])
+    f.site_gear(prior_permit, issued_by=s["supervisor"])
+    f.readiness(prior_permit, s["supervisor"], prior_at-2*MIN)
     for level in ("TOP", "MID", "BOTTOM"):
         f.reading(prior_permit, s["detector"], level, prior_at - 5 * MIN, s["supervisor"])
     prior = {**s, "permit": prior_permit, "at": prior_at}
@@ -259,6 +260,9 @@ def _prepare_short_rest(conn, f: Factory, s: dict) -> None:
     conn.execute("INSERT INTO entry_log (permit_id, worker_id, period, recorded_by) "
                  "VALUES (%s, %s, tstzrange(%s, %s), %s)",
                  (prior_permit, s["e1"], prior_at + 10 * MIN, prior_at + 100 * MIN, s["supervisor"]))
+    conn.execute("UPDATE entry_permit SET status='CLOSED',ended_at=%s WHERE permit_id=%s",
+                 (prior_at+110*MIN, prior_permit))
+    _authorise_raw(conn, s)
 
 
 # (rule, the invalid write, setup(conn, f, s), attack(conn, f, s)). s is a fresh permit that passes every clause.
@@ -577,7 +581,11 @@ def _meta(conn, argv: list[str]) -> dict:
     return {
         "Date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "Command": "`" + " ".join(["python scripts/evaluate.py", *argv]) + "`",
-        "Commit": f"`{commit}` (plus uncommitted changes, if any)",
+        "Commit": f"`{commit}`",
+        "Dirty tree": str(bool(subprocess.run(["git", "status", "--porcelain"], cwd=ROOT,
+                                               capture_output=True, text=True, check=True).stdout.strip())),
+        "Source SHA-256": source_fingerprint(),
+        "Schema revision": conn.execute("SELECT version_num FROM alembic_version").fetchone()["version_num"],
         "Machine": f"{platform.system()} {platform.release()}, {os.cpu_count()} logical CPUs, {platform.machine()}",
         "Python / PostgreSQL": f"{platform.python_version()} / "
                                f"{conn.execute('SHOW server_version').fetchone()['server_version']} (embedded, default settings)",

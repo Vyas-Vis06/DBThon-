@@ -75,6 +75,8 @@ _DB_MAP: dict[str, tuple[int, str, str | None]] = {
     "22P02": (422, "bad_value", "A value has an invalid format."),
     "22003": (422, "bad_value", "A numeric value is out of range."),
     "42501": (403, "forbidden", "You do not have permission to perform this action."),
+    "40001": (503, "transaction_retry", "The database aborted this transaction; retry the request with the same Idempotency-Key."),
+    "40P01": (503, "transaction_retry", "The database aborted this transaction; retry the request with the same Idempotency-Key."),
 }
 
 

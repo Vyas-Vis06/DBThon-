@@ -38,19 +38,22 @@ DECLARE
 BEGIN
   SELECT ulb_id INTO v_ulb FROM ulb WHERE name = 'Evaluation ULB';
   IF NOT FOUND THEN                                     -- first call: the fixed cast (one ULB, 500 manholes, 400 workers)
-    INSERT INTO ulb (name, district, state) VALUES ('Evaluation ULB', 'Chennai', 'Tamil Nadu') RETURNING ulb_id INTO v_ulb;
+    INSERT INTO ulb (name, district, state, policy_mode) VALUES ('Evaluation ULB', 'Synthetic', 'Synthetic', 'EDUCATIONAL') RETURNING ulb_id INTO v_ulb;
     INSERT INTO manhole (ulb_id, code, kind, depth_m, lat, lng)
     SELECT v_ulb, 'EVAL-MH-' || g, 'SEWER', 3.5, 13.0, 80.2 FROM generate_series(1, 500) g;
     INSERT INTO contractor (name, licence_no, licence_valid_until) VALUES ('Evaluation Contractor', 'EVAL-LIC-1', '2099-12-31');
     INSERT INTO machine (ulb_id, code, kind) VALUES (v_ulb, 'EVAL-MC-1', 'JETTING');
     INSERT INTO gas_detector (serial_no, model, calibration_valid_until) VALUES ('EVAL-GD-1', 'Synthetic 4-gas', '2099-12-31');
-    INSERT INTO app_user (role_id, email, full_name, password_hash)
-    SELECT role_id, lower(name) || '.eval@zeroentry.example', 'Evaluation ' || lower(name), 'not-a-real-hash'
+    INSERT INTO app_user (role_id, ulb_id, email, full_name, password_hash)
+    SELECT role_id, v_ulb, lower(name) || '.eval@zeroentry.example', 'Evaluation ' || lower(name), 'not-a-real-hash'
       FROM role WHERE name IN ('SUPERVISOR', 'ENGINEER');
     INSERT INTO worker (contractor_id, full_name, namaste_id, medical_fit_until, trained_until)
     SELECT (SELECT contractor_id FROM contractor WHERE licence_no = 'EVAL-LIC-1'), 'Evaluation worker ' || g,
            'NAM-EVAL-' || lpad(g::text, 4, '0'), '2099-12-31', '2099-12-31'
       FROM generate_series(1, 400) g;
+    INSERT INTO app_user(role_id,worker_id,email,full_name,password_hash)
+    SELECT r.role_id,w.worker_id,lower(w.namaste_id)||'.eval@zeroentry.example',w.full_name,'not-a-real-hash'
+      FROM worker w CROSS JOIN role r WHERE w.namaste_id LIKE 'NAM-EVAL-%' AND r.name='WORKER';
   END IF;
   SELECT contractor_id INTO v_contractor FROM contractor WHERE licence_no = 'EVAL-LIC-1';
   SELECT machine_id INTO v_machine FROM machine WHERE code = 'EVAL-MC-1';
@@ -89,12 +92,36 @@ BEGIN
     INSERT INTO mechanisation_waiver (job_id, reason_code, justification, approved_by)
     VALUES (v_j, 'NO_MACHINE_ACCESS', 'Narrow chamber with no vehicle access; jetting and suction units cannot reach it.', v_eng);
     INSERT INTO entry_permit (job_id, supervisor_id) VALUES (v_j, v_sup) RETURNING permit_id INTO v_p;
-    INSERT INTO permit_crew (permit_id, worker_id, crew_role)
-    VALUES (v_p, v_crew[1], 'ENTRANT'), (v_p, v_crew[2], 'ENTRANT'), (v_p, v_crew[3], 'STANDBY'), (v_p, v_crew[4], 'SUPERVISOR');
-    INSERT INTO gear_issue (permit_id, worker_id, gear_code, serial_no, issued_by)
-    SELECT v_p, e, gear_code, 'SN-' || gear_code, v_sup FROM gear_item, unnest(v_crew[1:2]) e WHERE statutory;
-    INSERT INTO gas_reading (permit_id, detector_id, depth_level, o2_pct, h2s_ppm, lel_pct, co_ppm, taken_at, recorded_by)
-    SELECT v_p, v_detector, lv, 20.9, 0, 0, 0, v_at - interval '5 minutes', v_sup FROM unnest(ARRAY['TOP', 'MID', 'BOTTOM']) lv;
+    INSERT INTO permit_crew (permit_id, worker_id, crew_role, acknowledged_at, acknowledged_by)
+    SELECT v_p,x.worker_id,x.crew_role,v_at-interval '2 minutes',u.user_id
+      FROM (VALUES(v_crew[1],'ENTRANT'),(v_crew[2],'ENTRANT'),(v_crew[3],'STANDBY'),(v_crew[4],'SUPERVISOR')) x(worker_id,crew_role)
+      JOIN app_user u USING(worker_id);
+    WITH assets AS (
+      INSERT INTO gear_asset(ulb_id,gear_code,serial_no,status,inspection_valid_until)
+      SELECT v_ulb,g.gear_code,format('EDU-EVAL-%s-%s-%s',v_p,e,g.gear_code),'USABLE','2099-12-31'
+        FROM gear_item g CROSS JOIN unnest(v_crew[1:2]) e WHERE g.statutory AND g.requirement_scope='ENTRANT'
+      RETURNING gear_asset_id,gear_code,serial_no
+    ) INSERT INTO gear_issue(permit_id,worker_id,gear_code,serial_no,issued_by,gear_asset_id)
+      SELECT v_p,e,a.gear_code,a.serial_no,v_sup,a.gear_asset_id FROM assets a CROSS JOIN unnest(v_crew[1:2]) e
+       WHERE a.serial_no=format('EDU-EVAL-%s-%s-%s',v_p,e,a.gear_code);
+    WITH assets AS (
+      INSERT INTO gear_asset(ulb_id,gear_code,serial_no,status,inspection_valid_until)
+      SELECT v_ulb,g.gear_code,format('EDU-EVAL-%s-SITE-%s',v_p,g.gear_code),'USABLE','2099-12-31'
+        FROM gear_item g WHERE g.requirement_scope='SITE' RETURNING gear_asset_id
+    ) INSERT INTO permit_site_gear(permit_id,gear_asset_id,issued_by) SELECT v_p,gear_asset_id,v_sup FROM assets;
+    INSERT INTO permit_readiness(permit_id,kind,passed,recorded_by,recorded_at,expires_at,details,source_mode)
+    SELECT v_p,kind,true,v_sup,v_at-interval '2 minutes',v_at+interval '2 hours',
+      CASE kind
+        WHEN 'STRUCTURE' THEN '{"inspection_ref":"EDU-EVAL","qualified_person_ref":"EDU-PERSON"}'::jsonb
+        WHEN 'ISOLATION' THEN '{"isolation_ref":"EDU-EVAL"}'::jsonb
+        WHEN 'VENTILATION' THEN jsonb_build_object('opened_at',v_at-interval '30 minutes','method_ref','EDU-VENT')
+        WHEN 'RESCUE' THEN '{"plan_ref":"EDU-PLAN","retrieval_asset_ref":"EDU-ASSET"}'::jsonb
+        WHEN 'COMMUNICATION' THEN '{"method_ref":"EDU-RADIO","test_ref":"EDU-TEST"}'::jsonb
+        WHEN 'TRAFFIC' THEN '{"barrier_ref":"EDU-BARRIER"}'::jsonb
+        ELSE '{"contact_ref":"EDU-CONTACT","first_aid_ref":"EDU-KIT"}'::jsonb END,'SIMULATED'
+      FROM unnest(ARRAY['STRUCTURE','ISOLATION','VENTILATION','RESCUE','COMMUNICATION','TRAFFIC','MEDICAL']) kind;
+    INSERT INTO gas_reading (permit_id, detector_id, depth_level, o2_pct, h2s_ppm, lel_pct, co_ppm, taken_at, recorded_by,source_mode)
+    SELECT v_p, v_detector, lv, 20.9, 0, 0, 0, v_at - interval '5 minutes', v_sup,'SIMULATED' FROM unnest(ARRAY['TOP', 'MID', 'BOTTOM']) lv;
     PERFORM * FROM authorise_entry(v_p, v_sup, v_at);
     INSERT INTO entry_log (permit_id, worker_id, period, recorded_by, recorded_at)
     SELECT v_p, e, tstzrange(v_at + interval '10 minutes', v_at + interval '40 minutes'), v_sup, v_at + interval '45 minutes'

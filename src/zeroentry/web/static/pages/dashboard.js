@@ -15,11 +15,11 @@ export default async function (root, { user }) {
         tile(d.complaints.OPEN, 'Open complaints', '/app/complaints'),
         tile(d.complaints.IN_PROGRESS, 'In progress', '/app/complaints'),
         tile(d.complaints.RESOLVED, 'Resolved', '/app/complaints'),
-        tile(sum(d.contractors, 'SUSPENDED', 'BLACKLISTED'), 'Contractors suspended or blacklisted', '/app/registry#contractors')),
+        tile(sum(d.contractors, 'SUSPENDED', 'BLACKLISTED'), 'Contractor status records marked restricted (internal status)', '/app/registry#contractors')),
       h('h2', {}, 'Entry permits'),
       h('div', { class: 'grid' },
         tile(d.permits.DRAFT, 'Drafts awaiting the gate', '/app/permits'),
-        tile(d.permits.AUTHORISED, 'Authorised: entry permitted', '/app/permits'),
+        tile(d.permits.AUTHORISED, 'Permits with recorded AUTHORISED status (check current policy and receipt)', '/app/permits'),
         tile(d.permits.CLOSED, 'Closed', '/app/permits'),
         tile(sum(d.permits, 'ABORTED', 'CANCELLED'), 'Aborted or cancelled', '/app/permits')));
     if (d.draft_permits_not_ready !== undefined) {
@@ -32,7 +32,7 @@ export default async function (root, { user }) {
       h('div', { class: 'grid' },
         tile(d.alerts.OPEN, 'Open alerts', '/app/shadow'),
         tile(d.alerts.EVIDENCE_RECEIVED, 'Late evidence: needs a human decision', '/app/shadow'),
-        tile(d.alerts.CONFIRMED, 'Confirmed shadow entries', '/app/shadow'),
+        tile(d.alerts.CONFIRMED, 'Alerts reviewed as likely shadow-entry', '/app/shadow'),
         tile(d.invoices_on_hold, 'Invoices on hold', '/app/invoices')),
       h('h2', {}, 'Consequences and policy'),
       h('div', { class: 'grid' },
@@ -51,7 +51,7 @@ export default async function (root, { user }) {
   if (d.my_permits) {                                   // worker
     root.append(h('h2', {}, 'Your permits'),
       h('div', { class: 'grid' },
-        tile(d.my_permits.AUTHORISED, 'Authorised: you may be asked to enter', '/app/permits'),
+        tile(d.my_permits.AUTHORISED, 'Permits with recorded decision status (check current policy and receipt)', '/app/permits'),
         tile(d.my_permits.DRAFT, 'Being prepared', '/app/permits'),
         tile(sum(d.my_permits, 'CLOSED', 'ABORTED', 'CANCELLED'), 'Finished', '/app/permits')),
       h('p', { class: 'muted' }, 'You can refuse an entry at any time with “Stop work” on the permit page. No one can overrule that in this system.'));

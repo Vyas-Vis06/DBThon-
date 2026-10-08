@@ -27,7 +27,10 @@ def main() -> None:
                               safety_sweep_interval_seconds=0))
     with TestClient(app) as client:
         for path, fragment in (("/app/login", "<!doctype html>"), ("/static/app.js", "export"),
-                               ("/static/style.css", "{")):
+                               ("/static/style.css", "{"),
+                               ("/static/pages/incident_reports.js", "export"),
+                               ("/static/pages/completion_review.js", "export"),
+                               ("/static/pages/judge_evidence.js", "export")):
             response = client.get(path)
             assert response.status_code == 200, (path, response.status_code, response.text[:300])
             assert fragment in response.text, path

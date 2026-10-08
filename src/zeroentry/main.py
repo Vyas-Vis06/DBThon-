@@ -15,7 +15,7 @@ from .db import database_status, make_engine, make_sessionmaker
 from .errors import install_error_handlers
 from .log import configure_logging, mask_url
 from .maintenance import maintain
-from .routers import admin, auth, complaints, detection, money, permits, reference, reports
+from .routers import accountability, admin, auth, complaints, detection, events, incident_reports, money, permits, reference, reports
 from .security import SlidingWindowLimiter
 
 log = logging.getLogger("zeroentry")
@@ -82,7 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             log.exception("health check failed")
             return JSONResponse({"status": "degraded", "version": __version__, "database": "down"}, status_code=503)
 
-    for module in (auth, reference, complaints, permits, detection, money, reports, admin):
+    for module in (auth, reference, complaints, permits, detection, money, reports, incident_reports, events, accountability, admin):
         app.include_router(module.router, prefix=API)
 
     if (WEB / "static").is_dir():                      # the browser UI: one HTML shell, one ES module per screen

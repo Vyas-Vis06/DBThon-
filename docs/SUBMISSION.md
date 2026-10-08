@@ -23,7 +23,7 @@ The prototype enforces recorded database state; it cannot observe whether a pers
 | 1 | Problem definition | Sewer and septic-tank worker safety in India; the motivating problem and target users are described with source limitations. The users are municipal engineers, site supervisors, sanitation workers, contractors, auditors and administrators. | [PROJECT_SPEC §2-3](../PROJECT_SPEC.md#2-the-real-world-problem), [proposal §3](proposal/ZeroEntry_DBThon2026_Proposal.md#3-the-problem-real-current-and-local) |
 | 2 | Domain | Urban sanitation and occupational safety in municipal sewer maintenance, with Tamil Nadu ULB demo data. Multiple parties create linked complaint, job, permit and evidence records; applicability of some source clauses and the illustrative gear catalogue remains subject to domain review. | [PROJECT_SPEC §1](../PROJECT_SPEC.md#1-problem-statement-and-how-it-was-interpreted), [ADR-001](decisions/README.md#adr-001--interpret-the-problem-as-sanitation-worker-safety) |
 | 3 | Existing system | Public product documents show established industrial electronic permit controls and municipal sanitation/workforce records. The reviewed sources do not establish whether a product can be configured for the exact combination in this prototype; lack of documentation is not proof of absence. | [POLICY_AND_PRIOR_ART](POLICY_AND_PRIOR_ART.md), [proposal §5.1](proposal/ZeroEntry_DBThon2026_Proposal.md#51-what-exists-today-and-what-it-does-not-do) |
-| 4 | Database design | 35 application tables, 3NF with deliberate exceptions justified, four ER diagrams and a generated schema reference. | [ER_DIAGRAM](ER_DIAGRAM.md), [DATABASE_DESIGN](DATABASE_DESIGN.md), [SCHEMA_REFERENCE](SCHEMA_REFERENCE.md) |
+| 4 | Database design | 50 application tables, 3NF with deliberate historical-snapshot/projection exceptions justified, ER diagrams and a generated schema reference. | [ER_DIAGRAM](ER_DIAGRAM.md), [DATABASE_DESIGN](DATABASE_DESIGN.md), [SCHEMA_REFERENCE](SCHEMA_REFERENCE.md) |
 | 5 | Innovation | (A) database-controlled authorization against configured requirements; (B) human-reviewed evidence-gap detection; (C) atomic recording of selected incident consequences. | [DATABASE_DESIGN §5, §6, §8](DATABASE_DESIGN.md#5-the-entry-gate-zero-entry) |
 | 6 | Novelty | The five-step statement for each innovation, with measured benefit. | [§3 below](#3-novelty-in-the-briefs-five-steps) |
 | 7 | Prototype | PostgreSQL 16 + FastAPI + a browser UI; setup and test scope are documented. | [README quick start](../README.md#quick-start), [DEMO_SCRIPT](development/DEMO_SCRIPT.md), [TESTING](TESTING.md) |
@@ -88,7 +88,7 @@ applicability notes are in [POLICY_AND_PRIOR_ART.md](POLICY_AND_PRIOR_ART.md).
 |---|---|---|---|---|
 | 1 | Problem identification and domain relevance | 4 | CO2 | §2 rows 1-3; [PROJECT_SPEC](../PROJECT_SPEC.md) (problem, roles, business rules `BR-nn`, assumptions `A-nn`) |
 | 2 | Database design and modelling | 5 | CO1, CO2 | [ER_DIAGRAM](ER_DIAGRAM.md), [DATABASE_DESIGN](DATABASE_DESIGN.md) (3NF and functional dependencies, keys, gate, detection), generated [SCHEMA_REFERENCE](SCHEMA_REFERENCE.md) |
-| 3 | DBMS implementation and technical depth | 5 | CO1 | 14 forward-only SQL/PL/pgSQL migrations; relational division and anti-joins; `EXCLUDE` constraint; state-machine and guard triggers; procedure; `security_invoker` views; row-level security; row locks; policy history and decision snapshots; see [TESTING](TESTING.md) for the current suite |
+| 3 | DBMS implementation and technical depth | 5 | CO1 | 16 forward-only SQL/PL/pgSQL migrations; relational division and anti-joins; `EXCLUDE` constraint; state-machine/guard/revision triggers; procedure; cursor showcase; `security_invoker` views; row-level security; row/advisory locks; policy history, positive/negative receipts, transactional replay and idempotency; see [TESTING](TESTING.md) for actual verified scope |
 | 4 | Innovation | 4 | CO1, CO2 | §3 A-C |
 | 5 | Novelty and differentiation | 5 | CO2 | §3 five-step tables; [proposal §5](proposal/ZeroEntry_DBThon2026_Proposal.md#5-novelty-and-prior-art) (prior art) |
 | 6 | SDG alignment and societal impact | 2 | CO2 | §5 |
@@ -120,10 +120,10 @@ and has automated unit, database and API tests; evaluation uses synthetic record
 sensors or operating environment have validated it.
 
 Path to TRL 5-6: run detection read-only on one zone's complaint history; trial with supervisors and real detector integration;
-review legal applicability and gear schedules; add ULB row scoping; validate against a managed PostgreSQL service
+review legal applicability and gear schedules; independently review the implemented ULB scoping and registry governance; validate against a managed PostgreSQL service
 ([ROADMAP backlog](../ROADMAP.md#backlog-not-started-not-required-for-the-demo)).
 
-**Demonstration:** the three-minute script ([DEMO_SCRIPT](development/DEMO_SCRIPT.md)) shows a configured denial, correction,
+**Demonstration:** the four-to-five-minute script ([DEMO_SCRIPT](development/DEMO_SCRIPT.md)) shows a configured denial, correction,
 authorization, an overrun record, evidence-gap alerts and the consequence transaction. Use the current reproduction commands
 and measured run metadata in [EVALUATION.md](EVALUATION.md); the separate temporal benchmark is documented in
 [evaluation/RESULTS.md](evaluation/RESULTS.md).
@@ -132,11 +132,11 @@ and measured run metadata in [EVALUATION.md](EVALUATION.md); the separate tempor
 
 | The proposal (2 Oct) said | Built | Why |
 |---|---|---|
-| 20 tables | 35 tables | sessions, source-classified policy history, permit decision snapshots, safety events, holds with provenance, alert history, legal clauses and resolution types |
+| 20 tables | 50 tables | sessions, source-classified policy history, decision receipts, readiness, serial resources, completion claims, standalone victim assessments, durable commands/events, governed scope allocations, safety events and source-specific holds; table count is not itself novelty |
 | Job-anchored anti-join view | complaint-anchored SE1 with a grace window and exemptions, plus SE2 | the team's query baseline can flag or miss labelled evidence states and cannot represent the human review of late evidence ([ADR-006](decisions/README.md#adr-006--detection-is-anchored-on-the-complaint-and-on-recorded-time), E1) |
 | JWT access tokens | opaque server-side sessions | real logout and revocation ([ADR-005](decisions/README.md#adr-005--opaque-server-side-sessions-not-jwt)) |
 | PostgreSQL in Docker | embedded PostgreSQL 16 from pip; a real server still works | one-command setup on any laptop ([ADR-004](decisions/README.md#adr-004--embedded-postgresql-for-development-and-tests)) |
 | React or Jinja + HTMX | a no-build browser UI | nothing to install or build ([ADR-009](decisions/README.md#adr-009--a-no-build-browser-ui)) |
 | `EXCLUDE USING gist (worker_id WITH =, ...)` | `int8range(worker_id, worker_id, '[]')` in the exclusion | the embedded server has no `btree_gist` |
 | EXPLAIN ANALYZE screenshots | `scripts/evaluate.py`, reproducible and checked in CI | [ADR-013](decisions/README.md#adr-013--measure-against-a-stated-baseline-read-rule-parameters-once-per-statement-migration-0011) |
-| A simulated gas-sensor feed | typed readings, bound to a calibrated detector | backlog |
+| A simulated gas-sensor feed | Authenticated local simulator, explicitly labelled SIMULATED and restricted to educational policy scopes | Software observation demo, not authenticated hardware telemetry |

@@ -5,6 +5,23 @@
 
 export const state = { user: null, csrf: null };
 
+function stable(value) {
+  if (Array.isArray(value)) return '[' + value.map(stable).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map((k) => JSON.stringify(k) + ':' + stable(value[k])).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+function pendingCommand(method, path, body) {
+  const slot = `zeroentry:pending:${method}:${path}`;
+  const serialized = stable(body);
+  let prior;
+  try { prior = JSON.parse(sessionStorage.getItem(slot) || 'null'); } catch { prior = null; }
+  if (prior?.body === serialized && prior.key) return { slot, body: serialized, key: prior.key };
+  const command = { slot, body: serialized, key: crypto.randomUUID() };
+  try { sessionStorage.setItem(slot, JSON.stringify({ body: command.body, key: command.key })); } catch { /* Continue with the action; storage is only a retry aid. */ }
+  return command;
+}
+
 export class ApiError extends Error {
   constructor(status, code, message, details) {
     super(message);
@@ -16,6 +33,8 @@ export async function api(method, path, body) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && state.csrf) headers['X-CSRF-Token'] = state.csrf;
+  const command = method === 'GET' ? null : pendingCommand(method, path, body === undefined ? null : body);
+  if (command) headers['Idempotency-Key'] = command.key;
   const res = await fetch('/api/v1' + path, {
     method, headers, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -26,6 +45,12 @@ export async function api(method, path, body) {
     throw new ApiError(401, 'unauthorized', 'Please sign in again.');
   }
   if (!res.ok) throw new ApiError(res.status, data?.error?.code, data?.error?.message || res.statusText, data?.error?.details);
+  if (command) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(command.slot) || 'null');
+      if (saved?.key === command.key) sessionStorage.removeItem(command.slot);
+    } catch { /* The committed response is still authoritative if browser storage is unavailable. */ }
+  }
   return data;
 }
 
@@ -192,11 +217,106 @@ const NAV = [
   ['permits', 'Permits', [...STAFF, 'CONTRACTOR', 'WORKER']],
   ['shadow', 'Shadow entries', ['ADMIN', 'ENGINEER', 'AUDITOR']],
   ['incidents', 'Incidents & compensation', [...STAFF, 'CONTRACTOR']],
+  ['incident_reports', 'Incident reports', ['ADMIN', 'ENGINEER', 'SUPERVISOR', 'AUDITOR']],
+  ['completion_review', 'Completion review', ['ADMIN', 'ENGINEER', 'AUDITOR']],
+  ['judge_evidence', 'Judge evidence', ['ADMIN', 'ENGINEER', 'SUPERVISOR', 'AUDITOR']],
   ['invoices', 'Invoices & holds', [...STAFF, 'CONTRACTOR']],
   ['registry', 'Registry', [...STAFF, 'CONTRACTOR', 'WORKER']],
   ['reports', 'Reports', ['ADMIN', 'ENGINEER', 'AUDITOR']],
   ['admin', 'Admin', ['ADMIN', 'AUDITOR']],
 ];
+
+function renderPolicyBanner(user) {
+  const box = document.getElementById('policy-banner');
+  if (!box) return;
+  const mode = user?.policy_mode;
+  const educational = user?.educational === true || user?.is_educational === true;
+  const source = user?.policy_source || user?.policy_provenance || user?.source_label;
+  const provenance = typeof source === 'string' ? source : source && typeof source === 'object'
+    ? Object.entries(source).map(([key, value]) => `${key}: ${value ?? 'unknown'}`).join(' · ') : '';
+  let heading = 'POLICY STATUS UNKNOWN';
+  let description = 'Scope or policy data is unavailable. Missing information requires human review; it is not evidence of permission.';
+  let kind = 'unknown';
+  if (educational || mode === 'EDUCATIONAL') {
+    heading = 'EDUCATIONAL SIMULATION — NOT DEPLOYABLE';
+    description = 'Positive decisions are limited to this educational scope and do not certify physical safety or legal permission.';
+    kind = 'education';
+  } else if (mode === 'DENIED') {
+    heading = 'REAL POLICY: DENIED';
+    description = 'The current scope policy denies entry. A waiver or complete evidence cannot override this result.';
+    kind = 'denied';
+  } else if (mode === 'REVIEW_REQUIRED') {
+    heading = 'REAL POLICY: REVIEW REQUIRED';
+    description = 'Policy applicability is unresolved. Treat this as an evidence gap requiring qualified human review.';
+    kind = 'review';
+  }
+  box.className = `policy-banner ${kind}`;
+  box.replaceChildren(h('strong', {}, heading), h('span', {}, description),
+    provenance && h('span', { class: 'policy-source' }, `Policy provenance: ${provenance}`),
+    document.getElementById('connection-state') || h('span', { class: 'connection', id: 'connection-state' }, 'Connection: checking'));
+}
+
+function setConnection(text, kind = '') {
+  const box = document.getElementById('connection-state');
+  if (box) { box.textContent = `Connection: ${text}`; box.className = `connection ${kind}`; }
+}
+
+let eventTimer = null;
+let eventCursor = null;
+let pageRender = null;
+let eventPollBusy = false;
+export const refreshPage = () => pageRender?.();
+
+function startEventPolling(user) {
+  if (eventTimer) clearTimeout(eventTimer);
+  eventCursor = null;
+  const ulbId = user?.ulb_id;
+  if (!ulbId) { setConnection('scope unavailable', 'bad'); return; }
+  const key = `zeroentry:event-cursor:${ulbId}`;
+  try { eventCursor = Number(sessionStorage.getItem(key) || 0); } catch { eventCursor = 0; }
+  const poll = async () => {
+    if (eventPollBusy || !state.user || String(state.user.ulb_id) !== String(ulbId)) return schedule(5000);
+    eventPollBusy = true;
+    try {
+      const result = await api('GET', `/events?ulb_id=${encodeURIComponent(ulbId)}&after=${encodeURIComponent(eventCursor)}&limit=50`);
+      const items = result.items || [];
+      if (result.reset_required) {
+        await pageRender?.();
+        eventCursor = Number(result.next_after ?? items.at(-1)?.event_seq ?? eventCursor);
+      } else {
+        for (const item of items) eventCursor = Math.max(eventCursor, Number(item.event_seq || 0));
+        if (Number(result.next_after) > eventCursor) eventCursor = Number(result.next_after);
+        if (items.length) {
+          const currentId = new URLSearchParams(location.search).get('id');
+          const currentPage = location.pathname.split('/')[2];
+          const relevant = items.some((item) => {
+            const type = String(item.entity_type || '').toLowerCase();
+            const typeMatches = currentPage === 'permit' ? type.includes('permit') || type.includes('reading') || type.includes('readiness') :
+              currentPage === 'incident_reports' ? type.includes('incident') :
+                currentPage === 'completion_review' ? type.includes('completion') || type.includes('claim') : false;
+            return typeMatches && (!currentId || String(item.entity_id) === String(currentId));
+          });
+          if (relevant) await pageRender?.();
+        }
+      }
+      try { sessionStorage.setItem(key, String(eventCursor)); } catch { /* in-memory cursor remains active */ }
+      setConnection('connected · checked just now', 'ok');
+      schedule(result.has_more ? 150 : 5000);
+    } catch (error) {
+      setConnection('disconnected · retrying', 'bad');
+      schedule(5000);
+    } finally { eventPollBusy = false; }
+  };
+  const schedule = (delay) => { if (state.user && String(state.user.ulb_id) === String(ulbId)) eventTimer = setTimeout(poll, delay); };
+  setConnection('connecting', '');
+  poll();
+}
+
+function stopEventPolling() {
+  if (eventTimer) clearTimeout(eventTimer);
+  eventTimer = null;
+  eventCursor = null;
+}
 
 function renderChrome(page) {
   const nav = document.getElementById('nav');
@@ -209,7 +329,14 @@ function renderChrome(page) {
     nav.append(h('a', { href: '/app/' + id, 'aria-current': id === page ? 'page' : undefined }, label));
   }
   who.append(h('span', {}, state.user.full_name, ' · ', badge(state.user.role, 'info')),
-    h('button', { type: 'button', onclick: guard(async () => { await api('POST', '/auth/logout'); location.assign('/app/login'); }) }, 'Sign out'));
+    h('button', { type: 'button', onclick: guard(async () => {
+      await api('POST', '/auth/logout');
+      stopEventPolling();
+      state.user = null;
+      state.csrf = null;
+      setConnection('signed out', '');
+      location.assign('/app/login');
+    }) }, 'Sign out'));
 }
 
 async function boot() {
@@ -222,14 +349,27 @@ async function boot() {
       const me = await api('GET', '/auth/me');
       state.user = me.user;
       state.csrf = me.csrf_token;
+      renderPolicyBanner(state.user);
     } catch { return; }                                   // api() already redirected to the sign-in page
   }
   renderChrome(page);
   let module;
-  try { module = await import(`/static/pages/${page}.js`); } catch { main.replaceChildren(h('h1', {}, 'Page not found'), h('p', {}, 'There is no such screen.')); return; }
-  main.replaceChildren();
-  try { await module.default(main, { user: state.user, params: new URLSearchParams(location.search) }); }
-  catch (e) { main.append(h('p', { class: 'banner bad' }, e.message || String(e))); }
+  try { module = await import(`/static/pages/${page}.js`); } catch (error) {
+    main.replaceChildren(h('h1', {}, 'Screen unavailable'), h('p', { class: 'banner bad', role: 'alert' }, `This screen could not be loaded: ${error.message || String(error)}`));
+    return;
+  }
+  const render = async () => {
+    const loading = h('p', { class: 'muted', role: 'status' }, 'Refreshing this view from the server…');
+    main.replaceChildren(loading);
+    try {
+      await module.default(main, { user: state.user, params: new URLSearchParams(location.search) });
+      loading.remove();
+    }
+    catch (e) { main.replaceChildren(h('p', { class: 'banner bad', role: 'alert' }, `Could not load current server data: ${e.message || String(e)}`)); }
+  };
+  pageRender = render;
+  await render();
+  if (state.user) startEventPolling(state.user);
   main.focus();
 }
 

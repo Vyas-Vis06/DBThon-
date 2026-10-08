@@ -1,5 +1,39 @@
 # Database design
 
+## ZE-2 additions (0015–0016)
+
+The implementation remains relational in `public` with bigint identities. These additions refine the existing model;
+the earlier UUID/React plan is a design reference, not a second executable schema.
+
+| Relation | Responsibility and design rationale |
+|---|---|
+| `ulb_contractor_scope` | Explicit municipality/contractor allocation with actor, time and governance reason; avoids requiring a first job merely to make a contractor selectable. |
+| `ulb_detector_scope` | Explicit instrument allocation keeps staff selection scoped without requiring a prior reading; ADMIN governs allocation. |
+| `gear_asset` | A serial physical item separate from catalogue `gear_item`; type, inspection and availability belong to the asset. |
+| `permit_site_gear` | Shared site assignments avoid incorrectly requiring every site item on every entrant. |
+| `permit_readiness` | Append-only typed observations for seven readiness dimensions; latest adverse/unknown data cannot be replaced by an older passing row. |
+| `permit_resource_reservation` | One crew or asset per row; partial unique occupancy indexes enforce exclusivity while ordered locking coordinates acquisition/release. |
+| `permit_decision_receipt` | Both passing and denied decisions, evidence revision, expiry and snapshot digest. Deliberate historical JSON does not become live authorization. |
+| `completion_claim` | Source-scoped external claims remain separate from authoritative internal evidence; optional job match explicitly represents missing/ambiguous linkage. |
+| `completion_projection` | Recomputable per-job review projection; this deliberate derived relation must agree with reference logic and needs time-triggered reconciliation too. |
+| `command_dedup` | Actor/operation/key uniqueness plus canonical request digest and stored response; retries share the business transaction rather than producing duplicate reports. |
+| `outbox_scope_counter` | Transactionally locked scope sequence prevents a client advancing past a still-uncommitted lower sequence. |
+| `outbox_event` | Durable minimal scoped notification history; `NOTIFY` would be only a wakeup, not this history. |
+| `incident_report` | Standalone safety report with optional job/permit/contractor links so absent registry data never prevents intake. |
+| `incident_report_victim` | One affected person per row, optional worker FK, separate alias/outcome and report-local victim key. |
+| `incident_assessment_case` | One pending reference assessment per victim; reference/claim/award/recorded payment amounts are distinct, not fabricated disbursement. |
+
+New ULB policy modes fail closed. Crew acknowledgment is separate from assignment. Nullable gas channels explicitly
+represent incomplete observations. `gear_issue` may identify a serial asset; `invoice_hold` preserves standalone report
+provenance in addition to its legacy incident or alert source. A snapshot hash is a local integrity check, not an
+external signature. Current revision/expiry controls admission without destroying historical completion evidence.
+
+FD examples: `gear_asset_id -> gear_code, serial_no, status, inspection_valid_until`; serial number is another candidate
+key. `(actor_user_id, operation, idempotency_key) -> body_sha256, response_status, response_json`. Report and victim
+attributes are split to avoid repeating incident descriptions per victim; the report-local victim key determines its
+identity only within that report. Projection and receipt snapshots are documented denormalization, not evidence that
+all relations require 5NF. See [ER_DIAGRAM](ER_DIAGRAM.md) and [SCHEMA_REFERENCE](SCHEMA_REFERENCE.md).
+
 **Authoritative for:** why the schema looks the way it does. *What* it contains, column by column, is generated from the live
 catalogue in [SCHEMA_REFERENCE.md](SCHEMA_REFERENCE.md); the pictures are in [ER_DIAGRAM.md](ER_DIAGRAM.md); the SQL itself is
 in [`database/migrations/sql/`](../database/migrations/sql/). Business-rule IDs (`BR-nn`) and assumptions (`A-nn`) refer to
@@ -21,7 +55,7 @@ in [`database/migrations/sql/`](../database/migrations/sql/). Business-rule IDs 
 
 ## 2. Entities and relationships
 
-Thirty-five tables, grouped by purpose. Core entities and their main relationships (cardinalities as drawn in ER_DIAGRAM):
+Fifty application tables: the 35-table foundation below plus the 15 ZE2 relations above. Core entities and their main relationships (cardinalities as drawn in ER_DIAGRAM):
 
 | Group | Tables | Key relationships |
 |---|---|---|

@@ -24,6 +24,8 @@ dependencies = [
 # Python 3.9-3.12 only. On newer Pythons the package still installs and the app runs against a real PostgreSQL server
 # (docs/SETUP.md), but the tests and scripts/dev.py need Python 3.11 or 3.12.
 dev = ["pytest>=8", "pytest-xdist>=3", "httpx>=0.27", "pgserver>=0.1.4; python_version < '3.13'"]
+# Real browser behavior is optional locally; CI installs Chromium separately.
+browser = ["playwright>=1.55,<2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -41,4 +43,5 @@ filterwarnings = [
 ]
 markers = [
   "slow: takes more than a few seconds",
+  "browser: real Chromium behavior; install the browser extra and Chromium",
 ]

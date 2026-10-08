@@ -20,23 +20,23 @@ def _invoice_world(conn, *, status="APPROVED"):
     ulb = f.ulb()
     manhole = f.manhole(ulb)
     contractor = f.contractor()
-    engineer = f.user("ENGINEER")
+    engineer = f.user("ENGINEER", ulb_id=ulb)
     complaint = f.resolved_complaint(manhole, datetime.now(timezone.utc) - timedelta(days=3))
     job = f.job(complaint, contractor)
     invoice = f.invoice(job, status=status, approver=engineer)
     worker = f.worker(contractor)
-    return {"complaint": complaint, "job": job, "manhole": manhole, "contractor": contractor,
+    return {"ulb": ulb, "complaint": complaint, "job": job, "manhole": manhole, "contractor": contractor,
             "engineer": engineer, "worker": worker, "invoice": invoice}
 
 
-def _background(db, actor, role, sql, params=(), *, contractor_id=None):
+def _background(db, actor, role, sql, params=(), *, contractor_id=None, ulb_id=None):
     started = threading.Event()
     result = {}
 
     def run():
         try:
             with db.connect("ze_app") as conn:
-                act_as(conn, actor, role, contractor_id=contractor_id)
+                act_as(conn, actor, role, contractor_id=contractor_id, ulb_id=ulb_id)
                 result["pid"] = conn.execute("SELECT pg_backend_pid() AS pid").fetchone()["pid"]
                 conn.execute("SET lock_timeout = '8s'")
                 conn.execute("SET statement_timeout = '10s'")
@@ -82,11 +82,12 @@ def test_invoice_creation_waiting_on_a_source_gets_that_source_hold(source, db, 
     world = _invoice_world(conn, status="SUBMITTED")
     sql, params = _source_statement(source, world)
     with db.connect("ze_app", autocommit=False) as source_tx:
-        act_as(source_tx, world["engineer"], "ENGINEER")
+        act_as(source_tx, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
         source_tx.execute(sql, params)
         thread, outcome = _background(
             db, world["engineer"], "ENGINEER",
-            "INSERT INTO invoice (job_id, invoice_no, amount_inr) VALUES (%s, 'RACE-AFTER', 900)", (world["job"],))
+            "INSERT INTO invoice (job_id, invoice_no, amount_inr) VALUES (%s, 'RACE-AFTER', 900)", (world["job"],),
+            ulb_id=world["ulb"])
         _wait_for_lock(db, outcome)
         source_tx.commit()
     thread.join(timeout=10)
@@ -103,11 +104,11 @@ def test_invoice_insert_waiting_on_source_gets_the_committed_source_hold(source,
     world = _invoice_world(conn, status="SUBMITTED")
     sql, params = _source_statement(source, world)
     with db.connect("ze_app", autocommit=False) as invoice_tx:
-        act_as(invoice_tx, world["engineer"], "ENGINEER")
+        act_as(invoice_tx, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
         invoice_tx.execute("INSERT INTO invoice (job_id, invoice_no, amount_inr) VALUES (%s, 'RACE-BEFORE', 900)",
                            (world["job"],))
         invoice_id = invoice_tx.execute("SELECT invoice_id FROM invoice WHERE invoice_no = 'RACE-BEFORE'").fetchone()["invoice_id"]
-        thread, outcome = _background(db, world["engineer"], "ENGINEER", sql, params)
+        thread, outcome = _background(db, world["engineer"], "ENGINEER", sql, params, ulb_id=world["ulb"])
         _wait_for_lock(db, outcome)
         invoice_tx.commit()
     thread.join(timeout=10)
@@ -123,9 +124,9 @@ def test_payment_committing_before_a_source_hold_stays_paid_without_a_hold(sourc
     world = _invoice_world(conn, status="APPROVED")
     sql, params = _source_statement(source, world)
     with db.connect("ze_app", autocommit=False) as payment:
-        act_as(payment, world["engineer"], "ENGINEER")
+        act_as(payment, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
         payment.execute("UPDATE invoice SET status = 'PAID' WHERE invoice_id = %s", (world["invoice"],))
-        thread, outcome = _background(db, world["engineer"], "ENGINEER", sql, params)
+        thread, outcome = _background(db, world["engineer"], "ENGINEER", sql, params, ulb_id=world["ulb"])
         _wait_for_lock(db, outcome)
         payment.commit()
     thread.join(timeout=10)
@@ -150,7 +151,7 @@ def test_source_hold_committing_before_approval_or_payment_blocks_it(source, db,
     world = _invoice_world(conn, status=initial_status)
     sql, params = _source_statement(source, world)
     with db.connect("ze_app", autocommit=False) as scanner:
-        act_as(scanner, world["engineer"], "ENGINEER")
+        act_as(scanner, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
         scanner.execute(sql, params)
         assert scanner.execute("SELECT count(*) AS n FROM invoice_hold WHERE invoice_id = %s AND released_at IS NULL",
                                (world["invoice"],)).fetchone()["n"] == 1
@@ -161,7 +162,7 @@ def test_source_hold_committing_before_approval_or_payment_blocks_it(source, db,
         else:
             sql = "UPDATE invoice SET status = 'PAID' WHERE invoice_id = %s"
             params = (world["invoice"],)
-        thread, outcome = _background(db, world["engineer"], "ENGINEER", sql, params)
+        thread, outcome = _background(db, world["engineer"], "ENGINEER", sql, params, ulb_id=world["ulb"])
         _wait_for_lock(db, outcome)
         scanner.commit()
     thread.join(timeout=10)
@@ -178,7 +179,7 @@ def test_a_late_machine_finalization_uses_server_receipt_not_the_old_deployment_
     ulb = f.ulb()
     manhole = f.manhole(ulb)
     contractor = f.contractor()
-    engineer = f.user("ENGINEER")
+    engineer = f.user("ENGINEER", ulb_id=ulb)
     resolved_at = datetime.now(timezone.utc) - timedelta(days=3)
     complaint = f.resolved_complaint(manhole, resolved_at)
     job = f.job(complaint, contractor)
@@ -188,10 +189,11 @@ def test_a_late_machine_finalization_uses_server_receipt_not_the_old_deployment_
     assert conn.execute("SELECT outcome_recorded_at FROM machine_deployment WHERE deploy_id = %s", (deploy,)).fetchone()["outcome_recorded_at"] is None
 
     with db.connect("ze_app") as runtime:
-        act_as(runtime, engineer, "ENGINEER")
+        act_as(runtime, engineer, "ENGINEER", ulb_id=ulb)
         # `ended_at` is supplied by the field user; the outcome receipt is assigned independently by the server.
-        runtime.execute("UPDATE machine_deployment SET ended_at = %s, outcome = 'CLEARED' WHERE deploy_id = %s",
-                        (resolved_at + timedelta(days=2), deploy))
+        updated = runtime.execute("UPDATE machine_deployment SET ended_at = %s, outcome = 'CLEARED' WHERE deploy_id = %s",
+                                  (resolved_at + timedelta(days=2), deploy))
+        assert updated.rowcount == 1, "scoped runtime update must finalize the intended deployment"
 
     finalized = conn.execute("SELECT recorded_at, outcome_recorded_at FROM machine_deployment WHERE deploy_id = %s",
                              (deploy,)).fetchone()
@@ -220,13 +222,13 @@ def test_runtime_role_cannot_set_or_rewrite_the_machine_outcome_receipt(conn, db
     ulb = f.ulb()
     manhole = f.manhole(ulb)
     contractor = f.contractor()
-    engineer = f.user("ENGINEER")
+    engineer = f.user("ENGINEER", ulb_id=ulb)
     complaint = f.complaint(manhole)
     job = f.job(complaint, contractor)
     machine = f.machine(ulb)
 
     with db.connect("ze_app") as runtime:
-        act_as(runtime, engineer, "ENGINEER")
+        act_as(runtime, engineer, "ENGINEER", ulb_id=ulb)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             runtime.execute("INSERT INTO machine_deployment (job_id, machine_id, started_at, ended_at, outcome, recorded_at) "
                             "VALUES (%s, %s, now(), now(), 'CLEARED', now() - interval '2 days')",
@@ -250,7 +252,9 @@ def test_migration_backfills_audited_finalization_and_leaves_unverifiable_legacy
                     conn.execute(migration.read_text(encoding="utf-8"))
 
             f = Factory(conn)
-            ulb = f.ulb()
+            # This database is deliberately stopped at migration0012; do not use the current
+            # convenience factory, whose policy_mode field exists only after migration0015.
+            ulb = f.insert("ulb", "ulb_id", name="Pre-0013 temporal fixture", district="Chennai", state="Tamil Nadu")
             manhole = f.manhole(ulb)
             contractor = f.contractor()
             complaint = f.complaint(manhole)

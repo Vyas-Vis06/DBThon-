@@ -20,7 +20,7 @@ flowchart LR
     E["errors.py<br/>SQLSTATE -> HTTP"]
   end
   subgraph PG["PostgreSQL 16"]
-    S["tables + constraints<br/>(35 tables)"]
+    S["tables + constraints<br/>(50 tables)"]
     T["triggers and functions<br/>the gate, consequences, detection"]
     P["row-level security<br/>(app.* settings per transaction)"]
   end

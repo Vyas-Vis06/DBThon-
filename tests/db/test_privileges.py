@@ -82,10 +82,10 @@ def test_gate_and_incident_machinery_work_under_the_runtime_role(app, conn):
     recorder's role itself. Both must work end to end when called by the runtime role."""
     f = Factory(conn)
     s = f.gate_scenario(datetime.now(IST))
-    act_as(app, s["supervisor"], "SUPERVISOR")
+    act_as(app, s["supervisor"], "SUPERVISOR", ulb_id=s["ulb"])
     rows = app.execute("SELECT * FROM authorise_entry(%s, %s, %s)", (s["permit"], s["supervisor"], s["at"])).fetchall()
     assert all(r["passed"] for r in rows) and rows[0]["permit_status"] == "AUTHORISED"
-    act_as(app, s["engineer"], "ENGINEER")
+    act_as(app, s["engineer"], "ENGINEER", ulb_id=s["ulb"])
     iid = app.execute("CALL record_incident('FATALITY', %s, %s, %s, 'Collapsed in the chamber', %s, %s, NULL, NULL::bigint)",
                       (s["at"] + (utc(2026, 1, 1, 0, 30) - utc(2026, 1, 1)), s["e1"], s["manhole"], s["engineer"], s["permit"])
                       ).fetchone()["p_incident_id"]

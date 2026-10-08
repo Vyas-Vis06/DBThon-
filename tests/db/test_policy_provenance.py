@@ -118,6 +118,8 @@ def test_successful_authorisation_stores_hashable_immutable_evidence_snapshot(co
     assert {clause["clause_code"] for clause in snapshot["gate"]} == {
         "MECH_WAIVER", "CONTRACTOR_OK", "CREW_ENTRANT", "CREW_SUPERVISOR", "CREW_STANDBY",
         "CREW_SIZE", "CREW_FIT", "GEAR_ALL", "GAS_TOP", "GAS_MID", "GAS_BOTTOM",
+        "POLICY_ELIGIBILITY", "CREW_ACK", "SITE_GEAR", "READINESS", "GEAR_ASSET",
+        "GAS_COMPLETE_SOURCE", "RESOURCE_AVAILABLE",
     }
     assert all(clause["passed"] and clause["detail"] for clause in snapshot["gate"])
     assert all(clause["sources"] for clause in snapshot["gate"])
@@ -171,7 +173,7 @@ def test_gate_denial_does_not_create_success_authorization_artifact(conn):
 def test_runtime_raw_authorization_cannot_backdate_its_gate_timestamp(db, conn):
     s = Factory(conn).gate_scenario(yesterday_ist())
     with db.connect(user="ze_app") as app:
-        act_as(app, s["supervisor"], "SUPERVISOR")
+        act_as(app, s["supervisor"], "SUPERVISOR", ulb_id=s["ulb"])
         with expect("ZE001"):
             app.execute(
                 "UPDATE entry_permit SET status = 'AUTHORISED', authorised_at = %s, authorised_by = %s "

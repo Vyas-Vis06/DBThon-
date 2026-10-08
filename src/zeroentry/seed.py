@@ -23,6 +23,12 @@ DEMO_USERS: list[tuple[str, str, str, dict[str, str]]] = [
     ("worker", "WORKER", "Murugan A. (worker login)", {"worker": "NAM-TN-100001"}),
     ("contractor", "CONTRACTOR", "Marina Sanitation (office)", {"contractor": "TN-SAN-2026-001"}),
     ("auditor", "AUDITOR", "Vikram Auditor", {}),
+    ("edu_engineer", "ENGINEER", "Synthetic Lab Engineer", {"ulb": "EDUCATIONAL LAB - Synthetic Adyar"}),
+    ("edu_supervisor", "SUPERVISOR", "Synthetic Lab Supervisor", {"ulb": "EDUCATIONAL LAB - Synthetic Adyar"}),
+    ("edu_worker_1", "WORKER", "Synthetic Lab Worker 1", {"worker": "NAM-TN-100009"}),
+    ("edu_worker_2", "WORKER", "Synthetic Lab Worker 2", {"worker": "NAM-TN-100010"}),
+    ("edu_worker_3", "WORKER", "Synthetic Lab Worker 3", {"worker": "NAM-TN-100011"}),
+    ("edu_worker_4", "WORKER", "Synthetic Lab Worker 4", {"worker": "NAM-TN-100012"}),
 ]
 
 

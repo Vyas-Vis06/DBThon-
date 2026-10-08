@@ -1,7 +1,8 @@
 -- rules_in_app_code.sql: THE CONVENTIONAL BASELINE for enforcement, used ONLY by scripts/evaluate.py in a throwaway
 -- database. It keeps the same tables, keys, CHECK, UNIQUE and EXCLUDE constraints, and disables every user-defined
--- trigger (the gate, freezes, guards, append-only rules, audit). That is the usual design in which the business rules
--- live in application code: the database still holds the data but accepts any write a client sends.
+-- trigger (the gate, freezes, guards, append-only rules, audit). This is a controlled unguarded-database ablation,
+-- not an implementation or benchmark of an application validator, and not a claim about the usual production design.
+-- It isolates the contribution of database triggers when a write bypasses any application validator.
 -- Foreign keys keep working (DISABLE TRIGGER USER leaves the internal constraint triggers on).
 --
 -- Scope: this measures whether the database schema itself rejects the listed malformed writes when its guards are

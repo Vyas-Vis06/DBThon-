@@ -6,7 +6,7 @@
 
 ZeroEntry links a municipal complaint/job record to database-owned permit decisions and reviewable evidence gaps.
 
-* A permit becomes `AUTHORISED` only when all 11 configured clauses pass. Per-entrant gear division, depth-specific gas
+* A permit becomes `AUTHORISED` only when all configured clauses pass. Per-entrant gear division, depth-specific gas
   checks and a distinct crew explain each denial. New entry admission rechecks current conditions. Unsafe readings,
   revoked credentials and periodic expiry sweeps stop permits while preserving physical exits and violation evidence.
 * SE1/SE2 detect missing expected evidence with resolution exemptions and a grace window. A machine outcome has its own
@@ -16,7 +16,14 @@ ZeroEntry links a municipal complaint/job record to database-owned permit decisi
 
 This is a tested software prototype over synthetic records. Source metadata separates law, court direction, guidance
 and product policy. The seeded gear applicability, delegated approval, compensation defaults and physical response need
-operator/domain review. [Policy and prior art](docs/POLICY_AND_PRIOR_ART.md) bounds the novelty claim.
+  operator/domain review. [Policy and prior art](docs/POLICY_AND_PRIOR_ART.md) bounds the novelty claim.
+
+The ZE-2 integration adds explicit educational/real policy modes, crew acknowledgment, shared equipment and resource
+occupancy, typed readiness, denied decision receipts, durable scoped event replay, exact-key retries, imported completion
+reconciliation and standalone multi-victim incident intake. Real/unknown scope defaults to review, not permission.
+The adapted three-worker instructions, repository review and demonstration order are in the
+[integration handoff](docs/development/INTEGRATION_GUIDE.md). Earlier planning alternatives are retained under `docs/plan/`
+as references; they do not replace the working stack.
 
 The upstream M6 evaluation and this release’s temporal evidence evaluation use stated synthetic baselines.
 See [EVALUATION.md](docs/EVALUATION.md) for current measurements and [SUBMISSION.md](docs/SUBMISSION.md) for the rubric map.
@@ -49,16 +56,18 @@ python -m pytest -n auto               # about 500 tests in about 2 minutes; eac
 
 | Area | What | Verified by |
 |---|---|---|
-| Schema | 35 tables, enforced foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 14 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
+| Schema | 50 tables, enforced foreign keys, CHECK/UNIQUE/exclusion constraints, indexes, 16 forward-only migrations | `tests/db/test_schema.py`, generated [SCHEMA_REFERENCE](docs/SCHEMA_REFERENCE.md) |
 | Entry gate | division, immutable parents, current admission, 90-minute stretches/30-minute rest, stop/exit events and tested concurrent decisions | `tests/db/test_entry_gate.py`, `test_entry_rules.py`, `test_concurrency.py` |
 | Detection by absence | SE1 / SE2 anti-joins, grace window, idempotent scan, review with history, invoice holds with provenance | `tests/db/test_detection.py` (the six scenarios) |
 | Consequences | `record_incident()` procedure, compensation payments, holds | `tests/db/test_consequences.py` |
 | API | FastAPI, guarded operations, sessions, CSRF, lockout, six roles, scoped decision/event reads and row-level security | `tests/api/` (every endpoint × every role), `tests/db/test_rls.py` |
-| UI | no-build browser UI, strict CSP | walked through by hand; `tests/api/test_web.py` (no headless-browser tests) |
+| UI | no-build browser UI, strict CSP, policy/provenance labels and receipt/reconciliation/incident screens | `tests/api/test_web.py`; optional real Chromium workflows in `tests/browser/` |
 | SQL showcase | joins, aggregates, search, division, anti-join, views, transactions, trigger refusals | `database/queries/`, each file run by `tests/db/test_demo_queries.py` |
-| Evaluation | accuracy, enforcement and latency against stated baselines, at up to 100,000 complaints | `python scripts/evaluate.py` ([EVALUATION.md](docs/EVALUATION.md)); counts asserted by `tests/db/test_evaluation.py` |
+| Evaluation | accuracy, enforcement and latency against stated baselines; current ZE2 runs at 1,000 and 10,000 complaints | `python scripts/evaluate.py` ([EVALUATION.md](docs/EVALUATION.md)); counts asserted by `tests/db/test_evaluation.py`; earlier 100,000-row results are historical |
 
-CI runs the suite on Linux/Windows (Python 3.11/3.12), macOS (3.12), and a disposable PostgreSQL 16 service. A separate installed-wheel smoke checks the HTML/JS/CSS distribution.
+CI is configured for Linux/Windows (Python 3.11/3.12), macOS (3.12), a disposable PostgreSQL 16 service and a dedicated
+Chromium workflow job. A separate installed-wheel smoke checks the HTML/JS/CSS distribution. Remote branch CI results
+must be checked after publication; a configured workflow is not evidence that a remote run passed.
 
 ## Repository map
 

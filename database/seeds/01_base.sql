@@ -8,6 +8,12 @@ INSERT INTO ulb (name, district, state) VALUES
   ('GCC Zone 13 - Adyar',     'Chennai', 'Tamil Nadu')
 ON CONFLICT (name) DO NOTHING;
 
+-- This isolated synthetic scope is the only seeded scope allowed to exercise successful simulated entry.
+-- The three city-labelled examples above retain the migration's fail-closed REVIEW_REQUIRED default.
+INSERT INTO ulb (name, district, state, policy_mode)
+VALUES ('EDUCATIONAL LAB - Synthetic Adyar', 'Synthetic test district', 'Synthetic', 'EDUCATIONAL')
+ON CONFLICT (name) DO UPDATE SET policy_mode='EDUCATIONAL';
+
 -- 60 manholes, 20 per zone. Every 5th is a septic tank; depths 2.0-6.5 m; coordinates scatter around Chennai.
 INSERT INTO manhole (ulb_id, code, kind, depth_m, lat, lng, address)
 SELECT u.ulb_id,
@@ -24,6 +30,11 @@ FROM (VALUES
      ) AS z(ulb_name, abbr, lat_off, lng_off, label)
 JOIN ulb u ON u.name = z.ulb_name
 CROSS JOIN generate_series(1, 20) AS g
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO manhole (ulb_id, code, kind, depth_m, lat, lng, address)
+SELECT ulb_id, 'EDU-ADY-001', 'SEWER', 3.50, 0, 0, 'Synthetic educational fixture only'
+FROM ulb WHERE name='EDUCATIONAL LAB - Synthetic Adyar'
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO contractor (name, licence_no, licence_valid_until) VALUES
@@ -55,6 +66,10 @@ FROM (VALUES ('GCC Zone 4 - Tondiarpet', 'JET-TON-01', 'JETTING'),
              ('GCC Zone 13 - Adyar',     'SUC-ADY-01', 'SUCTION'),
              ('GCC Zone 13 - Adyar',     'ROB-ADY-01', 'ROBOT')) AS m(ulb_name, code, kind)
 JOIN ulb u ON u.name = m.ulb_name
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO machine (ulb_id, code, kind)
+SELECT ulb_id, 'EDU-ROB-01', 'ROBOT' FROM ulb WHERE name='EDUCATIONAL LAB - Synthetic Adyar'
 ON CONFLICT (code) DO NOTHING;
 
 -- Two detectors; the second one's calibration has lapsed (the demo shows its readings being refused).

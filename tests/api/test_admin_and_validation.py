@@ -58,7 +58,8 @@ def test_rule_changes_are_range_checked_audited_and_change_the_gate(api, world):
     _, _, permit = build_permit(api, world)
     ok(admin.patch(f"{API}/rules/min_crew_size", json={"value": 5, "reason": "Synthetic test policy adjustment"}))                                  # tighten: 4 people are now too few
     denied = ok(sup.post(f"{API}/permits/{permit['permit_id']}/authorise"))
-    assert denied["failed"] == ["CREW_SIZE"] and "4 of the required 5" in denied["clauses"][5]["detail"]
+    by_code = {clause["clause_code"]: clause for clause in denied["clauses"]}
+    assert denied["failed"] == ["CREW_SIZE"] and "4 of the required 5" in by_code["CREW_SIZE"]["detail"]
     ok(admin.patch(f"{API}/rules/min_crew_size", json={"value": 4, "reason": "Synthetic test policy adjustment"}))
     assert ok(sup.post(f"{API}/permits/{permit['permit_id']}/authorise"))["authorised"] is True
     trail = ok(api("auditor").get(f"{API}/audit-log?table_name=rule_parameter&row_pk=min_crew_size"))
@@ -84,7 +85,8 @@ def test_validation_errors_share_one_shape_and_name_the_field(api, world):
     assert {d["field"] for d in error["details"]} == {"manhole_id", "description"}
     refused(eng.post(f"{API}/complaints", json={"manhole_id": world["manhole"], "description": "ok", "status": "RESOLVED"}), 422, "validation_error")   # no mass assignment
     refused(eng.post(f"{API}/complaints", content=b"{not json", headers={"Content-Type": "application/json"}), 422)
-    refused(eng.post(f"{API}/jobs", json={"complaint_id": 999999, "contractor_id": world["ca"]}), 409, "reference_conflict")
+    # RLS deliberately hides whether an out-of-scope or nonexistent complaint id exists.
+    refused(eng.post(f"{API}/jobs", json={"complaint_id": 999999, "contractor_id": world["ca"]}), 403, "forbidden")
     refused(eng.get(f"{API}/complaints/abc"), 422, "validation_error")
     refused(eng.get(f"{API}/no-such-endpoint"), 404, "not_found")
     refused(eng.delete(f"{API}/auth/me"), 405, "method_not_allowed")
@@ -110,12 +112,17 @@ def test_crud_on_reference_data_and_database_refusals_become_readable_errors(api
     admin, eng = api("admin"), api("engineer")
     ulb = ok(admin.post(f"{API}/ulbs", json={"name": "GCC Zone 99", "district": "Chennai", "state": "Tamil Nadu"}), 201)
     refused(admin.post(f"{API}/ulbs", json={"name": "GCC Zone 99", "district": "Chennai", "state": "Tamil Nadu"}), 409, "duplicate")
-    mh = ok(eng.post(f"{API}/manholes", json={"ulb_id": ulb["ulb_id"], "code": "ZZ-001", "kind": "SEWER", "depth_m": 3.5, "lat": 13.1, "lng": 80.2}), 201)
-    refused(eng.post(f"{API}/manholes", json={"ulb_id": ulb["ulb_id"], "code": "ZZ-002", "kind": "SEWER", "depth_m": 0, "lat": 13.1, "lng": 80.2}), 422)
-    refused(eng.post(f"{API}/manholes", json={"ulb_id": 999999, "code": "ZZ-003", "kind": "SEWER", "depth_m": 3, "lat": 13.1, "lng": 80.2}), 409, "reference_conflict")
+    mh = ok(eng.post(f"{API}/manholes", json={"ulb_id": world["ulb"], "code": "ZZ-001", "kind": "SEWER", "depth_m": 3.5, "lat": 13.1, "lng": 80.2}), 201)
+    refused(eng.post(f"{API}/manholes", json={"ulb_id": world["ulb"], "code": "ZZ-002", "kind": "SEWER", "depth_m": 0, "lat": 13.1, "lng": 80.2}), 422)
+    # A scoped ENGINEER cannot create in a different or unknown ULB; only ADMIN can bootstrap that scope.
+    refused(eng.post(f"{API}/manholes", json={"ulb_id": ulb["ulb_id"], "code": "ZZ-003", "kind": "SEWER", "depth_m": 3, "lat": 13.1, "lng": 80.2}), 403, "forbidden")
+    refused(eng.post(f"{API}/manholes", json={"ulb_id": 999999, "code": "ZZ-004", "kind": "SEWER", "depth_m": 3, "lat": 13.1, "lng": 80.2}), 403, "forbidden")
     assert ok(eng.patch(f"{API}/manholes/{mh['manhole_id']}", json={"depth_m": 4.25}))["depth_m"] == 4.25
+    foreign_mh = ok(admin.post(f"{API}/manholes", json={"ulb_id": ulb["ulb_id"], "code": "ZZ-005", "kind": "SEWER",
+        "depth_m": 3, "lat": 13.1, "lng": 80.2}), 201)
     refused(admin.delete(f"{API}/ulbs/{ulb['ulb_id']}"), 409, "reference_conflict")          # still has a manhole
     ok(admin.delete(f"{API}/manholes/{mh['manhole_id']}"))
+    ok(admin.delete(f"{API}/manholes/{foreign_mh['manhole_id']}"))
     ok(admin.delete(f"{API}/ulbs/{ulb['ulb_id']}"))
     refused(admin.get(f"{API}/ulbs/{ulb['ulb_id']}"), 404)
 

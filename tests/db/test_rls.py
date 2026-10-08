@@ -25,7 +25,7 @@ def world(conn):
                       s["at"] + (yesterday_ist(10, 40) - yesterday_ist(10, 0)), s["supervisor"]))
         s["invoice"] = f.invoice(s["job"])
         s["contractor_user"] = f.user("CONTRACTOR", contractor_id=s["contractor"])
-        s["worker_user"] = f.user("WORKER", worker_id=s["e1"])
+        s["worker_user"] = s["worker_user_e1"]
         w[tag] = s
     a, b = w["a"], w["b"]
     f.insert("shadow_entry_alert", "alert_id", complaint_id=a["complaint"], rule_code="SE1_NO_CLEARANCE_EVIDENCE",
@@ -63,6 +63,43 @@ def test_with_no_context_nothing_can_be_written_either(world, app):
         app.execute("INSERT INTO complaint (manhole_id, description) VALUES (1, 'x')")
     assert app.execute("UPDATE contractor SET name = 'hijacked'").rowcount == 0
     assert app.execute("DELETE FROM worker").rowcount == 0
+
+
+def test_a_worker_can_ack_only_their_own_assignment_and_cannot_forge_the_actor(db, conn):
+    s = Factory(conn).gate_scenario(yesterday_ist())
+    f = Factory(conn)
+    worker_user = s["worker_user_e1"]
+    forged_worker = f.worker(s["contractor"])
+    with db.connect(user="ze_app") as app:
+        act_as(app,s["supervisor"],"SUPERVISOR")
+        with expect("ZE006","cannot insert a worker acknowledgement"):
+            app.execute("INSERT INTO permit_crew(permit_id,worker_id,crew_role,acknowledged_at,acknowledged_by) "
+                        "VALUES(%s,%s,'ENTRANT',clock_timestamp(),%s)",(s["permit"],forged_worker,s["supervisor"]))
+    conn.execute("UPDATE permit_crew SET acknowledged_at=NULL,acknowledged_by=NULL WHERE permit_id=%s AND worker_id=%s",
+                 (s["permit"],s["e1"]))
+    with db.connect(user="ze_app") as app:
+        act_as(app,worker_user,"WORKER",worker_id=s["e1"])
+        with expect("ZE006","assigned worker"):
+            app.execute("UPDATE permit_crew SET acknowledged_at=clock_timestamp(),acknowledged_by=%s "
+                        "WHERE permit_id=%s AND worker_id=%s",(s["supervisor"],s["permit"],s["e1"]))
+        assert app.execute("UPDATE permit_crew SET acknowledged_at=clock_timestamp(),acknowledged_by=%s "
+                           "WHERE permit_id=%s AND worker_id=%s",(worker_user,s["permit"],s["e1"])).rowcount==1
+        assert app.execute("UPDATE permit_crew SET acknowledged_at=clock_timestamp(),acknowledged_by=%s "
+                           "WHERE permit_id=%s AND worker_id=%s",(worker_user,s["permit"],s["e2"])).rowcount==0
+    row=conn.execute("SELECT acknowledged_by FROM permit_crew WHERE permit_id=%s AND worker_id=%s",
+                     (s["permit"],s["e1"])).fetchone()
+    assert row["acknowledged_by"]==worker_user
+
+
+def test_engineer_cannot_authorize_a_permit_outside_their_stored_scope(db, conn):
+    f = Factory(conn)
+    own = f.gate_scenario(yesterday_ist())
+    foreign = f.gate_scenario(yesterday_ist())
+    with db.connect(user="ze_app") as app:
+        act_as(app, own["engineer"], "ENGINEER", ulb_id=own["ulb"])
+        with expect("ZE006", "cannot authorize"):
+            app.execute("SELECT * FROM authorise_entry(%s,%s,%s)",
+                        (foreign["permit"], own["engineer"], foreign["at"]))
 
 
 # --- a contractor sees and touches only its own rows ----------------------------------------------------------
@@ -181,30 +218,30 @@ def test_an_auditor_reads_alerts_and_audit_but_cannot_write_anything(world, conn
 def test_a_supervisor_writes_only_their_own_permits_and_cannot_see_alerts(world, conn, app):
     f, a, b = world["f"], world["a"], world["b"]
     draft_b = f.permit(b["job"], b["supervisor"])                    # B's supervisor starts a new draft permit
-    act_as(app, a["supervisor"], "SUPERVISOR")
-    assert count(app, "entry_permit") == 3 and count(app, "shadow_entry_alert") == 0       # reads all permits, sees no alerts
+    act_as(app, a["supervisor"], "SUPERVISOR", ulb_id=a["ulb"])
+    assert count(app, "entry_permit") == 1 and count(app, "shadow_entry_alert") == 0       # own stored ULB only; no alerts
     assert app.execute("UPDATE entry_permit SET end_reason = 'meddling' WHERE permit_id = %s", (draft_b,)).rowcount == 0
     with expect("42501"):                                                                 # crew on someone else's draft
         app.execute("INSERT INTO permit_crew (permit_id, worker_id, crew_role) VALUES (%s, %s, 'ENTRANT')", (draft_b, b["e1"]))
-    act_as(app, b["supervisor"], "SUPERVISOR")                                            # its owner may
+    act_as(app, b["supervisor"], "SUPERVISOR", ulb_id=b["ulb"])                            # its owner may
     app.execute("INSERT INTO permit_crew (permit_id, worker_id, crew_role) VALUES (%s, %s, 'ENTRANT')", (draft_b, f.worker(b["contractor"])))
 
 
 def test_a_supervisor_can_create_a_permit_only_as_themselves(world, conn, app):
     """Regression: the insert policy must check the new row's own supervisor_id, not look the (nonexistent) row up."""
     a, b = world["a"], world["b"]
-    act_as(app, a["supervisor"], "SUPERVISOR")
+    act_as(app, a["supervisor"], "SUPERVISOR", ulb_id=a["ulb"])
     assert app.execute("INSERT INTO entry_permit (job_id, supervisor_id) VALUES (%s, %s) RETURNING permit_id", (a["job"], a["supervisor"])).fetchone()
     with expect("42501"):
         app.execute("INSERT INTO entry_permit (job_id, supervisor_id) VALUES (%s, %s)", (a["job"], b["supervisor"]))   # on someone's behalf
-    act_as(app, a["engineer"], "ENGINEER")
+    act_as(app, a["engineer"], "ENGINEER", ulb_id=a["ulb"])
     with expect("42501"):
         app.execute("INSERT INTO entry_permit (job_id, supervisor_id) VALUES (%s, %s)", (a["job"], a["supervisor"]))   # engineers do not draft
 
 def test_a_fatality_recorded_by_a_supervisor_still_runs_in_full(world, conn, app):
     """A supervisor has no right to blacklist, yet recording a death must - so the procedure runs with definer rights."""
     a = world["a"]
-    act_as(app, a["supervisor"], "SUPERVISOR")
+    act_as(app, a["supervisor"], "SUPERVISOR", ulb_id=a["ulb"])
     assert app.execute("UPDATE contractor SET status = 'BLACKLISTED'").rowcount == 0                      # directly: refused
     iid = app.execute("CALL record_incident('FATALITY', %s, %s, %s, 'Collapsed in the chamber', %s, %s, NULL, NULL::bigint)",
                       (a["at"] + (yesterday_ist(10, 30) - yesterday_ist(10, 0)), a["e1"], a["manhole"], a["supervisor"], a["permit"])
@@ -222,7 +259,7 @@ def test_a_fatality_recorded_by_a_supervisor_still_runs_in_full(world, conn, app
 # --- engineers and administrators ---------------------------------------------------------------------------------------
 def test_the_detection_workflow_runs_under_an_engineer_context(world, conn, app):
     a = world["a"]
-    act_as(app, a["engineer"], "ENGINEER")
+    act_as(app, a["engineer"], "ENGINEER", ulb_id=a["ulb"])
     app.execute("SELECT * FROM scan_shadow_entries(now())")
     (alert,) = [r["alert_id"] for r in app.execute("SELECT alert_id FROM shadow_entry_alert")]
     row = app.execute("SELECT * FROM review_shadow_alert(%s, 'CONFIRMED', 'Crew admitted entering unpermitted.', %s)",
@@ -237,7 +274,7 @@ def test_only_an_admin_can_change_the_law_and_the_catalogues(world, conn, app):
     app.execute("SELECT set_config('app.rule_change_reason', 'Synthetic RLS policy verification', false)")
     assert app.execute("UPDATE rule_parameter SET value = 4 WHERE param_key = 'min_crew_size'").rowcount == 1
     assert app.execute("UPDATE gear_item SET statutory = false WHERE gear_code = 'GUMBOOTS'").rowcount == 1
-    act_as(app, a["engineer"], "ENGINEER")
+    act_as(app, a["engineer"], "ENGINEER", ulb_id=a["ulb"])
     assert app.execute("UPDATE gear_item SET statutory = false WHERE gear_code = 'SAFETY_HARNESS'").rowcount == 0
     assert app.execute("UPDATE gas_detector SET calibration_valid_until = '2099-01-01'").rowcount == 0
     with expect("42501"):

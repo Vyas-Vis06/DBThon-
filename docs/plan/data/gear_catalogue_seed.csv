@@ -1,0 +1,45 @@
+gear_code,name,clause_ref,source_url,verification_status,requirement_scope,default_required
+GEAR_R4_01,Air compressor for blower,Rule 4(i),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_02,Air line breathing apparatus,Rule 4(ii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_03,Air line respirator with manually operated air blower,Rule 4(iii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_04,Air Purifier Gas mask/chin cortege,Rule 4(iv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_05,Artificial respiration/Reticulate,Rule 4(v),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_06,Barrier caution tape,Rule 4(vi),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_07,Barrier cream,Rule 4(vii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_08,Barrier cone,Rule 4(viii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_09,Blower,Rule 4(ix),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_10,Breath mask,Rule 4(x),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_11,Breathing Apparatus,Rule 4(xi),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_12,Caution board,Rule 4(xii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_13,Chlorine mask,Rule 4(xiii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_14,Emergency medical oxygen resuscitator Kit,Rule 4(xiv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_15,First Aid Box,Rule 4(xv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_16,Face Mask,Rule 4(xvi),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_17,Gas Monitor (4 gases),Rule 4(xvii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_18,Guide Pipe Set,Rule 4(xviii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_19,Full body wader suit,Rule 4(xix),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_20,Fishing wader suit attached with boots,Rule 4(xx),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_21,Hand gloves,Rule 4(xxi),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_22,Head Lamp,Rule 4(xxii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_23,Helmet,Rule 4(xxiii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_24,Helmet demolishing,Rule 4(xxiv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_25,Lead acetate paper,Rule 4(xxv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_26,Life guard pad,Rule 4(xxvi),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_27,Modular Airlines Supply Trolley System,Rule 4(xxvii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_28,Normal face mask,Rule 4(xxviii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_29,Nylon rope ladder 5 metres,Rule 4(xxix),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_30,Nylon safety belt,Rule 4(xxx),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_31,Pocket book,Rule 4(xxxi),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_32,Port oxy,Rule 4(xxxii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_33,Raincoat,Rule 4(xxxiii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_34,Reflecting Jacket,Rule 4(xxxiv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_35,Safety belt,Rule 4(xxxv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_36,Safety body clothing,Rule 4(xxxvi),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_37,Safety body harness,Rule 4(xxxvii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_38,Safety goggles,Rule 4(xxxviii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_39,Safety Gumboots,Rule 4(xxxix),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_40,Safety helmet,Rule 4(xl),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_41,Safety showers,Rule 4(xli),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_42,Safety torch,Rule 4(xlii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_43,Safety Tripod Set,Rule 4(xliii),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false
+GEAR_R4_44,Search light,Rule 4(xliv),https://ncsk.nic.in/sites/default/files/MSRULES2013HINDIPDF10022026_0-1.pdf,PRIMARY_TEXT_VERIFIED,UNASSIGNED,false

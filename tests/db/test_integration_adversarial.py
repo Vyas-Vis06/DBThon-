@@ -17,11 +17,11 @@ def _invoice_world(conn, *, invoice_status="APPROVED"):
     ulb = f.ulb()
     manhole = f.manhole(ulb)
     contractor = f.contractor()
-    engineer = f.user("ENGINEER")
+    engineer = f.user("ENGINEER", ulb_id=ulb)
     complaint = f.resolved_complaint(manhole, datetime.now(timezone.utc) - timedelta(days=3))
     job = f.job(complaint, contractor)
     invoice = f.invoice(job, status=invoice_status, approver=engineer)
-    return {"engineer": engineer, "manhole": manhole, "contractor": contractor, "complaint": complaint,
+    return {"engineer": engineer, "ulb": ulb, "manhole": manhole, "contractor": contractor, "complaint": complaint,
             "job": job, "invoice": invoice}
 
 
@@ -111,7 +111,7 @@ def test_authorisation_rechecks_gas_freshness_after_waiting_for_the_permit_row(d
     def authorise_after_wait():
         try:
             with db.connect("ze_app", autocommit=False) as app:
-                act_as(app, s["supervisor"], "SUPERVISOR")
+                act_as(app, s["supervisor"], "SUPERVISOR", ulb_id=s["ulb"])
                 result["decision_clock"] = app.execute("SELECT now() AS at").fetchone()["at"]
                 result["pid"] = app.execute("SELECT pg_backend_pid() AS pid").fetchone()["pid"]
                 app.execute("SET lock_timeout = '20s'")
@@ -168,7 +168,7 @@ def test_repeatable_read_authorization_cannot_use_a_stale_draft_dependency(db, c
         runtime.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
         runtime.execute("SET lock_timeout = '8s'")
         runtime.execute("SET statement_timeout = '12s'")
-        act_as(runtime, s["supervisor"], "SUPERVISOR")
+        act_as(runtime, s["supervisor"], "SUPERVISOR", ulb_id=s["ulb"])
         assert runtime.execute(
             "SELECT is_active FROM worker WHERE worker_id = %s", (s["e1"],)
         ).fetchone()["is_active"]
@@ -203,7 +203,7 @@ def test_repeatable_read_payment_waiting_for_new_alert_hold_is_rejected(db, conn
         try:
             with db.connect("ze_app", autocommit=False) as payment:
                 payment.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
-                act_as(payment, world["engineer"], "ENGINEER")
+                act_as(payment, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
                 outcome["holds_before"] = payment.execute(
                     "SELECT count(*) AS n FROM invoice_hold WHERE invoice_id = %s AND released_at IS NULL",
                     (world["invoice"],),
@@ -227,7 +227,7 @@ def test_repeatable_read_payment_waiting_for_new_alert_hold_is_rejected(db, conn
     assert outcome.get("holds_before") == 0
 
     with db.connect("ze_app", autocommit=False) as source:
-        act_as(source, world["engineer"], "ENGINEER")
+        act_as(source, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
         assert source.execute("SELECT * FROM scan_shadow_entries(clock_timestamp())").fetchall()
         assert source.execute(
             "SELECT count(*) AS n FROM invoice_hold WHERE invoice_id = %s AND released_at IS NULL",
@@ -253,11 +253,11 @@ def test_repeatable_read_invoice_creation_after_alert_fails_with_retryable_error
     world = _invoice_world(conn, invoice_status="SUBMITTED")
     invoice_tx = db.connect("ze_app", autocommit=False)
     invoice_tx.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
-    act_as(invoice_tx, world["engineer"], "ENGINEER")
+    act_as(invoice_tx, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
     assert invoice_tx.execute("SELECT count(*) AS n FROM shadow_entry_alert").fetchone()["n"] == 0
 
     with db.connect("ze_app", autocommit=False) as source:
-        act_as(source, world["engineer"], "ENGINEER")
+        act_as(source, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
         assert source.execute("SELECT * FROM scan_shadow_entries(clock_timestamp())").fetchall()
         with pytest.raises(psycopg.Error) as error:
             invoice_tx.execute(
@@ -282,7 +282,7 @@ def test_repeatable_read_source_creation_fails_with_retryable_error(db, conn, so
     worker = Factory(conn).worker(world["contractor"])
     with db.connect("ze_app", autocommit=False) as runtime:
         runtime.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
-        act_as(runtime, world["engineer"], "ENGINEER")
+        act_as(runtime, world["engineer"], "ENGINEER", ulb_id=world["ulb"])
         if source == "alert":
             statement = "SELECT * FROM scan_shadow_entries(clock_timestamp())"
             params = ()

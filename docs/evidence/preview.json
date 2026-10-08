@@ -1,0 +1,23 @@
+{
+  "experiment": "E5 controlled application-preview/write interleaving",
+  "recorded_at": "2026-10-07T18:21:55.859314+00:00",
+  "machine": "Windows-10-10.0.19045-SP0",
+  "python": "3.12.14",
+  "postgresql": "16.2",
+  "migration_sha256": "6e315a37f5b74c69da3d6082580606ba8072d72f3989a2848b06853366f4162e",
+  "results": {
+    "application_preview_write": {
+      "ordinary_pass": true,
+      "ordinary_deny": true,
+      "after_interleaving_status": "AUTHORISED",
+      "stale_authorization_accepted_in_trial": true
+    },
+    "database_revalidation": {
+      "ordinary_pass": true,
+      "ordinary_deny": true,
+      "after_interleaving_status": "DRAFT",
+      "stale_authorization_accepted_in_trial": false
+    }
+  },
+  "limits": "Synthetic single interleaving; identical predicate; no performance, production-product or physical-safety claim. Correct application locking/revalidation can also close this race."
+}

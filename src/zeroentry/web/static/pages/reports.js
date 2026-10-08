@@ -5,11 +5,12 @@ const bar = (pct) => h('div', { class: 'bar', role: 'img', 'aria-label': pct + '
 const sizeBars = (root) => root.querySelectorAll('.bar > span[data-w]').forEach((s) => { s.style.width = Math.max(0, Math.min(100, Number(s.dataset.w))) + '%'; });
 
 export default async function (root) {
-  root.append(h('h1', {}, 'Reports'), h('p', { class: 'muted' }, 'Each report is a database view or aggregate query; the object behind it is named under the table.'));
+  root.append(h('h1', {}, 'Reports'), h('p', { class: 'muted' }, 'Each report is a database view or aggregate query; the object behind it is named under the table. Payment values shown here are recorded fields, not external disbursement proof.'),
+    h('p', { class: 'banner warn' }, 'These aggregates describe this system’s records and configured scope. They do not measure deaths prevented or prove a legal outcome.'));
 
   const zeroEntry = async (box) => {
     const data = await api('GET', '/reports/ulb-kpis');
-    box.append(h('p', { class: 'muted' }, 'Zero-entry rate: the share of jobs that stayed mechanised. Manual entries exist only as documented, waiver-backed exceptions. View: v_ulb_year_kpi.'),
+    box.append(h('p', { class: 'muted' }, 'Recorded mechanised-job share for the selected system data. It is not an impact measure. View: v_ulb_year_kpi.'),
       table([['Zone', (r) => r.ulb_name], ['Year', (r) => r.year], ['Jobs', (r) => r.jobs], ['Mechanised', (r) => r.mechanised_jobs], ['Manual exceptions', (r) => r.manual_exception_jobs],
         ['Zero-entry rate', (r) => h('div', { class: 'row' }, bar(Number(r.zero_entry_rate_pct)), Number(r.zero_entry_rate_pct) + ' %')]], data.zero_entry, 'No jobs yet.'),
       h('h2', {}, 'Incidents and deaths per zone per year'), h('p', { class: 'muted' }, 'View: v_ulb_year_incidents (COUNT, SUM, AVG).'),
@@ -20,7 +21,7 @@ export default async function (root) {
 
   const risk = async (box) => {
     const data = await api('GET', '/reports/contractor-risk');
-    box.append(h('p', { class: 'muted' }, 'Score = 10 × deaths + 5 × disabilities + 3 × confirmed shadow entries + 1 × open alerts + 2 × overdue compensation cases (illustrative weights). View: v_contractor_risk.'),
+    box.append(h('p', { class: 'muted' }, 'Illustrative internal review index: 10 × recorded deaths + 5 × disabilities + 3 × alerts reviewed as likely + 1 × open alerts + 2 × overdue case records. It is not a legal finding or culpability score. View: v_contractor_risk.'),
       table([['Contractor', (r) => r.name], ['Status', (r) => badge(r.status)], ['Deaths', (r) => r.fatalities], ['Disabilities', (r) => r.disabilities],
         ['Confirmed alerts', (r) => r.confirmed_alerts], ['Open alerts', (r) => r.open_alerts], ['Overdue cases', (r) => r.overdue_cases], ['Risk score', (r) => h('strong', {}, r.risk_score)]], data.items));
   };
@@ -43,7 +44,7 @@ export default async function (root) {
       table([['Rule', (r) => r.rule_code], ['Status', (r) => badge(r.status)], ['Alerts', (r) => r.alerts], ['Oldest detected', (r) => fmtDT(r.oldest)]], summary.items, 'No alerts yet.'),
       h('h2', {}, 'Draft permits and what they are missing right now'), h('p', { class: 'muted' }, 'View: v_permit_compliance, which evaluates the legal-clause gate for every draft.'),
       table([['Permit', (r) => h('a', { href: '/app/permit?id=' + r.permit_id }, '#' + r.permit_id)], ['Clauses failing', (r) => `${r.clauses_failed} of ${r.clauses_total}`],
-        ['Ready?', (r) => r.ready_to_authorise ? badge('READY', 'ok') : badge('NOT READY', 'bad')], ['Failing', (r) => r.failing_clauses || '']], ready.items, 'No draft permits.'));
+        ['Current configured preview', (r) => r.ready_to_authorise ? badge('CHECKS PASS · NOT A RECEIPT', 'info') : badge('INCOMPLETE', 'warn')], ['Failing', (r) => r.failing_clauses || '']], ready.items, 'No draft permits.'));
   };
 
   root.append(tabs([{ id: 'zero', label: 'Zero-entry and incidents', render: zeroEntry }, { id: 'risk', label: 'Contractor risk', render: risk },

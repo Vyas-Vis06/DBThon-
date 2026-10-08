@@ -4,12 +4,14 @@
 from datetime import timedelta
 
 import pytest
+from psycopg.types.json import Jsonb
 
 from tests.factories import Factory, ist, yesterday_ist
 from tests.helpers import expect
 
 ALL_CLAUSES = {"MECH_WAIVER", "CONTRACTOR_OK", "CREW_ENTRANT", "CREW_SUPERVISOR", "CREW_STANDBY", "CREW_SIZE",
-               "CREW_FIT", "GEAR_ALL", "GAS_TOP", "GAS_MID", "GAS_BOTTOM"}
+               "CREW_FIT", "GEAR_ALL", "GAS_TOP", "GAS_MID", "GAS_BOTTOM", "POLICY_ELIGIBILITY",
+               "CREW_ACK", "SITE_GEAR", "READINESS", "GEAR_ASSET", "GAS_COMPLETE_SOURCE", "RESOURCE_AVAILABLE"}
 
 
 @pytest.fixture
@@ -45,9 +47,9 @@ def test_a_fully_compliant_permit_is_authorised(conn, f):
 
 def test_checklist_rows_carry_title_legal_reference_and_detail_in_order(conn, f):
     rows = authorise(conn, f.gate_scenario(yesterday_ist()))
-    assert len(rows) == 11
+    assert len(rows) == 18
     assert all(r["title"] and r["legal_ref"] and r["detail"] for r in rows)
-    assert [r["clause_code"] for r in rows][:2] == ["MECH_WAIVER", "CONTRACTOR_OK"]
+    assert [r["clause_code"] for r in rows][:3] == ["POLICY_ELIGIBILITY", "MECH_WAIVER", "CONTRACTOR_OK"]
     assert [r["clause_code"] for r in rows][-3:] == ["GAS_TOP", "GAS_MID", "GAS_BOTTOM"]
 
 
@@ -81,7 +83,7 @@ CLAUSE_CASES = {
     "entrant_missing_one_item": (_set("DELETE FROM gear_issue WHERE worker_id = %s AND gear_code = 'SAFETY_HARNESS'", "e2"),
                                  {"GEAR_ALL"}, "Safety harness with lifeline"),
     "no_statutory_gear_defined": (lambda c, s: c.execute("UPDATE gear_item SET statutory = false"),
-                                  {"GEAR_ALL"}, "No statutory gear item is defined"),
+                                  {"GEAR_ALL"}, "No entrant-scoped statutory gear item is defined"),
 }
 
 
@@ -108,7 +110,7 @@ def test_gear_division_names_the_entrant_and_only_the_entrant_who_is_short(conn,
 
 # --- gas: division over the three depth levels, latest reading governs ------------------------------------
 GAS_CASES = {
-    "bottom_never_tested":   ({"BOTTOM": None},                 {"GAS_BOTTOM"}, "No BOTTOM reading"),
+    "bottom_never_tested":   ({"BOTTOM": None},                 {"GAS_BOTTOM", "GAS_COMPLETE_SOURCE"}, "No BOTTOM reading"),
     "bottom_22_min_old":     ({"BOTTOM": {"age_min": 22}},      {"GAS_BOTTOM"}, "22 min old"),
     "exactly_15_min_ok":     ({"MID": {"age_min": 15}},         set(),          None),
     "16_min_fails":          ({"MID": {"age_min": 16}},         {"GAS_MID"},    "16 min old"),
@@ -134,6 +136,31 @@ def test_gas_clauses(conn, f, name):
         assert re.search(detail, " ".join(r["detail"] for r in rows if not r["passed"]))
 
 
+def test_newer_incomplete_readiness_overrides_an_older_complete_pass_and_is_retained(conn, f):
+    s = f.gate_scenario(yesterday_ist())
+    recorded = s["at"] + timedelta(seconds=1)
+    f.insert("permit_readiness", "readiness_id", permit_id=s["permit"], kind="STRUCTURE", passed=True,
+             recorded_by=s["supervisor"], recorded_at=recorded, expires_at=recorded+timedelta(days=1),
+             details=Jsonb({}), source_mode="SIMULATED")
+    rows = authorise(conn, s)
+    assert failed(rows) == {"READINESS"}
+    latest = conn.execute("SELECT details FROM permit_readiness WHERE permit_id=%s AND kind='STRUCTURE' "
+                          "ORDER BY recorded_at DESC,readiness_id DESC LIMIT 1", (s["permit"],)).fetchone()
+    assert latest["details"] == {}
+
+
+def test_future_ventilation_opened_at_fails_readiness(conn, f):
+    s = f.gate_scenario(yesterday_ist())
+    latest = conn.execute("SELECT details FROM permit_readiness WHERE permit_id=%s AND kind='VENTILATION' "
+                          "ORDER BY recorded_at DESC,readiness_id DESC LIMIT 1", (s["permit"],)).fetchone()["details"]
+    latest["opened_at"] = (s["at"] + timedelta(minutes=1)).isoformat()
+    recorded = s["at"] - timedelta(minutes=1)
+    f.insert("permit_readiness", "readiness_id", permit_id=s["permit"], kind="VENTILATION", passed=True,
+             recorded_by=s["supervisor"], recorded_at=recorded, expires_at=s["at"]+timedelta(days=1),
+             details=Jsonb(latest), source_mode="SIMULATED")
+    assert failed(authorise(conn, s)) == {"READINESS"}
+
+
 def test_a_newer_bad_reading_is_not_hidden_behind_an_older_good_one(conn, f):
     s = f.gate_scenario(yesterday_ist())
     f.reading(s["permit"], s["detector"], "TOP", s["at"] - timedelta(minutes=2), s["supervisor"], o2=15.0)
@@ -149,7 +176,7 @@ def test_a_newer_good_reading_supersedes_an_older_bad_one(conn, f):
 def test_readings_taken_after_the_authorisation_instant_do_not_count(conn, f):
     s = f.gate_scenario(yesterday_ist(), readings={"BOTTOM": None})
     f.reading(s["permit"], s["detector"], "BOTTOM", s["at"] + timedelta(minutes=10), s["supervisor"])
-    assert failed(authorise(conn, s)) == {"GAS_BOTTOM"}
+    assert failed(authorise(conn, s)) == {"GAS_BOTTOM", "GAS_COMPLETE_SOURCE"}
 
 
 def test_gas_limits_are_rule_parameters_not_code(conn, f):
@@ -177,8 +204,7 @@ def test_denial_with_three_reasons_then_fix_and_authorise(conn, f):
     # the supervisor fixes each point: a distinct standby, the missing gear, a fresh BOTTOM reading
     standby = f.worker(s["contractor"])
     f.crew(s["permit"], standby, "STANDBY")
-    conn.execute("INSERT INTO gear_issue (permit_id, worker_id, gear_code, serial_no) VALUES (%s, %s, 'BREATHING_APPARATUS', 'SN-NEW')",
-                 (s["permit"], s["e1"]))
+    f.issue_gear_item(s["permit"], s["e1"], "BREATHING_APPARATUS", s["supervisor"])
     f.reading(s["permit"], s["detector"], "BOTTOM", s["at"] - timedelta(minutes=1), s["supervisor"])
     rows = authorise(conn, s)
     assert failed(rows) == set() and status(conn, s) == "AUTHORISED"
@@ -187,7 +213,7 @@ def test_denial_with_three_reasons_then_fix_and_authorise(conn, f):
 def test_live_readiness_view_reports_failing_clauses_of_draft_permits(conn, f):
     ok = f.gate_scenario(yesterday_ist())                       # stale as of now(): readings are a day old
     row = conn.execute("SELECT * FROM v_permit_compliance WHERE permit_id = %s", (ok["permit"],)).fetchone()
-    assert row["clauses_total"] == 11 and row["ready_to_authorise"] is False
+    assert row["clauses_total"] == 18 and row["ready_to_authorise"] is False
     assert set(row["failing_clauses"].split(", ")) == {"GAS_BOTTOM", "GAS_MID", "GAS_TOP"}
     authorise(conn, ok)
     assert conn.execute("SELECT count(*) AS n FROM v_permit_compliance WHERE permit_id = %s", (ok["permit"],)).fetchone()["n"] == 0
@@ -197,7 +223,7 @@ def test_live_readiness_view_reports_failing_clauses_of_draft_permits(conn, f):
 def test_raw_update_cannot_authorise_a_non_compliant_permit(conn, f):
     s = f.gate_scenario(yesterday_ist())
     conn.execute("DELETE FROM permit_crew WHERE permit_id = %s AND crew_role = 'STANDBY'", (s["permit"],))
-    with expect("ZE001", r"Entry denied.*standby"):
+    with expect("ZE001", r"Entry denied.*CREW_STANDBY"):
         conn.execute("UPDATE entry_permit SET status = 'AUTHORISED', authorised_at = %s, authorised_by = %s WHERE permit_id = %s",
                      (s["at"], s["supervisor"], s["permit"]))
     assert status(conn, s) == "DRAFT"
@@ -237,7 +263,7 @@ def test_the_state_machine_forbids_illegal_transitions(conn, f):
     authorise(conn, s)
     with expect("ZE003", "AUTHORISED to DRAFT"):
         conn.execute("UPDATE entry_permit SET status = 'DRAFT' WHERE permit_id = %s", (s["permit"],))
-    with expect("ZE003", "can no longer be authorised"):          # authorising twice
+    with expect("ZE003", "cannot be authorised"):                  # authorising twice
         authorise(conn, s)
     with expect("ZE003", "cannot be altered"):
         conn.execute("UPDATE entry_permit SET valid_until = valid_until + interval '3 hours' WHERE permit_id = %s", (s["permit"],))

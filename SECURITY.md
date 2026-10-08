@@ -50,6 +50,16 @@ credentials, personal data or production URLs in an issue.
 | Runtime authorization requires READ COMMITTED; stale snapshots of draft-worker credentials are refused through both function and raw UPDATE | migration `0014` | `tests/db/test_integration_adversarial.py` |
 | A failed detection scan cannot roll back a committed safety stop; automatic work uses bounded waits and transaction advisory locks | `maintenance.py` | `tests/db/test_maintenance.py` |
 
+## ZE2 integration controls
+
+| Control | Verification |
+|---|---|
+| Positive decisions require complete latest readiness, actor-owned crew acknowledgements, inspected serial assets and complete fresh gas evidence; admission rechecks revision and expiry | `tests/db/test_entry_rules.py`, `tests/db/test_entry_gate.py`, `tests/api/test_workflow.py` |
+| Safety stops retain resource occupancy until truthful exits; adverse gas or asset evidence commits a stop rather than disappearing through rollback | `tests/db/test_safety_lifecycle.py`, `tests/browser/test_workflows.py` |
+| Stored actor scope, explicit contractor/detector allocations and authorization checks constrain cross-ULB operations | `tests/api/test_scoping_and_money.py`, `tests/db/test_integration_adversarial.py` |
+| Durable command keys prevent duplicate effects; event replay is scoped and bounded; multi-victim intake and financial holds are atomic | `tests/api/test_incident_reports.py`, `tests/api/test_accountability.py`, `tests/browser/test_workflows.py` |
+| Time-only projection changes are periodically reconciled; the live reference remains authoritative | `tests/db/test_completion_projection.py`, `tests/db/test_projection_clock.py` |
+
 ## Known limitations (not hidden, not fixed)
 
 * **Row-level security is a second line, not the first.** Anyone who can run arbitrary SQL as `ze_app` can set the
@@ -58,7 +68,9 @@ credentials, personal data or production URLs in an issue.
 * **The per-IP throttle lives in process memory.** Behind several workers each keeps its own window; the per-account lockout in
   the database is the authoritative brake.
 * **No TLS in the application.** Run it behind a reverse proxy that terminates HTTPS and set `COOKIE_SECURE=true`.
-* **Engineers and supervisors see every ULB.** ULB-scoped visibility is in the ROADMAP backlog.
+* **Scope is not jurisdiction certification.** ZE-2 restricts engineer/supervisor work records to the stored ULB and
+  requires explicit scopes for new replay/report routes. ADMIN retains cross-scope authority; the legacy AUDITOR workflow
+  remains cross-scope read-only. Initial registry onboarding and instrument allocation require trusted administration.
 * **The database enforces state, not physics.** A typed gas value may be false; it is bound to a detector serial, a calibration
   date and a signed-in recorder, and kept append-only (PROJECT_SPEC §7).
 * **Append-only is an application trust boundary.** A database owner or superuser can disable triggers or alter the schema.

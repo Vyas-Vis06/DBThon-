@@ -1,0 +1,37 @@
+# Copy-paste packet: A — PostgreSQL engine and LAB evidence
+
+You are Worker A in a four-person team building ZeroEntry for a DBMS hackathon. L owns contracts/root/release, you own the database, B owns FastAPI/integration/benchmarks, C owns React/demo/pitch. Work only in the selected team repository at the actual baseline SHA supplied by L. If absent, inspect and report the SHA and ask L which baseline to use; do not invent a remote or overwrite existing work. This packet authorizes implementation of your assigned lane; it does not authorize real-world deployment or changes to unrelated accounts.
+
+Context: ZeroEntry is a mechanisation-first municipal occupational-safety/evidence-accountability prototype. It links actual workers, current evidence and exclusive resources to a versioned decision receipt and reconciles closure/invoice claims. This is an integration contribution, not an invented claim that permit blocking or SQL is new. The professor prioritizes meaningful DBMS integration, especially all six LAB experiments. The rubric is30 marks including TRL/demo. Do not add arbitrary tables solely for marks.
+
+Read before editing: SCHEMA_CONTRACT.md, ROUTINES_AND_INVARIANTS.md, API_CONTRACT.md, VALIDATION_PLAN.md, SYLLABUS_AND_RUBRIC.md, LAB_SQL_BLUEPRINT.md and the runbook. Read REVIEW_AND_EVIDENCE for source constraints; data CSVs are staging inputs, not blindly executable SQL COPY. These ZE-1.0 contracts supersede the friend's M1 and any conflicting older prompt.
+
+Owned paths: db/alembic/versions, db/sql, db/seed, tests/db, docs/evidence/db. Do not edit backend, frontend, root dependency files or contracts. Request dependencies/contract changes from L with a failing example. PostgreSQL16 only, UUID keys, schema ze, UTC timestamptz, numeric INR, 37 canonical base relations. Extensions btree_gist and pgcrypto. Alembic is the only schema authority; B must not generate a parallel migration history.
+
+Build three small milestones:
+
+### A1 — schema and fixtures
+
+Deliver revision001 with every dictionary relation, real FK/UQ/CHECK, source categories, precise nullability, scope checks, partial uniqueness and resource exclusions. Keep permit_crew UUID PK plus UQ(permit_id,worker_id), and certificate_evidence normalized evidence FKs. Explicitly model no-permit incidents/unregistered victims and one complaint with multiple jobs. Historical evidence is not cascade-deleted. Add description and stop_latched_at fields as frozen. Implement code-to-ID staging import with validation and deterministic IDs. Seed relative-time fixtures for real DENY scope and EDU_LAB only. Load all44 catalogue items but require only selected applicable personal/site items. Document legal text vs demo assumptions.
+
+Acceptance: clean database migrates; one Alembic head; reload seed is idempotent; invalid references, negative amounts, duplicate source observation and overlapping resources reject; unknown prerequisites never become a green decision. Supply actual commands/output, not “should pass.”
+
+### A2 — current-evidence engine
+
+Implement every public signature in ROUTINES_AND_INVARIANTS; shared helpers centralize gates, permissions, scope and dedup. Use a fixed parameter vocabulary, not arbitrary SQL strings. All operational writes lock the existing ulb row first, read fresh evidence after acquiring it, then acquire ordered resource locks. Explain the deliberate per-ULB serialization trade-off. btree_gist exclusions are a second barrier, not a substitute for the shared write protocol.
+
+G0 must deny real prohibited/unknown scope even if all safeguards are green. EDU_LAB is educational-only and cannot be activated by ordinary actors. G1 uses nonempty entrants and requirement sets with NOT EXISTS relational division, separate personal/site quantities and distinct serial assets. G2 uses the latest coherent sample per depth without filtering away newer unsafe/incomplete observations. Preserve null/quality failures. G3 checks calibration. G4 checks distinct acknowledged crew. G5 verifies mechanical/exception record without overriding G0. G6 checks90-minute planned stretches,30-minute rest across permit IDs and educational operating hours. G7 credentials/readiness; G8 expiry, revision and stop-latch lifecycle.
+
+Authorise stores a committed positive or negative immutable receipt, exact evidence links, source rule/revision and expiry. Begin-entry locks and re-evaluates: a preview or earlier green receipt is not authority. Expired time alone cannot wake a trigger, so provide expiry worker and mandatory action-boundary checks. Ingestion/readiness/refusal changes preserve adverse evidence, invalidate receipts and latch stop as appropriate; no retroactive rewriting. Resolve stop returns DRAFT with no open entries and acceptable post-latch evidence, then needs fresh authorization. Do not clear an unsafe latch merely because a delayed safe sample arrived.
+
+All crew/site resources remain occupied through real open entries, not just a predicted end. Truthful late exit must be stored with a violation, not rejected to preserve a fictitiously compliant history. Closing/aborting a permit does not invent exits. Secure engine functions use a fixed search_path and narrow grants; runtime login has no direct operational DML and cannot become owner. Test as runtime, not superuser.
+
+Acceptance: relevant T01–T24 in VALIDATION_PLAN; app-role direct SQL denial; concurrent evidence change/authorization and competing resource cases with B; null/empty and newer-incomplete cases; actor scope failures; old receipt invalidation after rule change. Return code must not throw away a persisted business denial by rolling back the whole request.
+
+### A3 — accountable closure, incident, report and evidence
+
+Implement affected-job anti-join reconciliation and shadow projection, comparing historical completion against evidence at the event time. Exclude legitimate alternate jobs/cancellations; missing evidence means REVIEW_REQUIRED, not crime. Invoice derived-state updates must not recursively trigger reconciliation. Incident procedure creates incident, victims, pending cases, relevant holds/abort, audit/outbox and dedup in one caller-owned transaction. No payments or legal blacklist. One incident can have multiple victims, including people absent from worker registry. Use a test-only fault injection to prove rollback; never expose it in public API.
+
+Persist outbox with per-ULB event ordering under the same mutex; NOTIFY only wakes a listener. Provide cursor open/fetch/close inside one transaction, with set-based report totals. Complete revision003 grants/views and auditable runtime isolation. Supply query-plan before/after captures, six LAB scripts, functional dependencies/normalization explanation and backup/restore checks. SQL examples must use canonical names. Oracle26 has CREATE ASSERTION, while PostgreSQL16 lacks that SQL-standard feature; do not teach the false “no database supports assertions” claim.
+
+Before pushing: owned diff only, no credentials/generated secret dumps, run clean migration and relevant tests, fetch/merge main and re-run. Push a milestone branch, open PR through authorized team workflow and send the exact runbook handoff. L merges. If blocked by an API change, send a CCR; continue independent SQL tests. No scope expansion to cloud services or a generic legal expert system. If you delegate repetitive checks, use GPT-6 Luna when available, not Astra. Mark all unrun tests and unfinished items explicitly.

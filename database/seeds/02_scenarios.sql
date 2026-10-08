@@ -60,6 +60,9 @@ DO $seed$
 DECLARE
   v_eng bigint := pg_temp.uid('engineer');
   v_sup bigint := pg_temp.uid('supervisor');
+  v_edu_eng bigint := pg_temp.uid('edu_engineer');
+  v_edu_sup bigint := pg_temp.uid('edu_supervisor');
+  v_edu_ulb bigint := (SELECT ulb_id FROM ulb WHERE name='EDUCATIONAL LAB - Synthetic Adyar');
   v_at  timestamptz := from_local(date_trunc('day', local_ts(now())) - interval '1 day' + interval '10 hours');  -- yesterday 10:00 IST
   v_c bigint; v_j bigint; v_p bigint; v_inc bigint; v_case bigint;
 BEGIN
@@ -105,30 +108,63 @@ BEGIN
   v_c := pg_temp.complaint('CHN-ADY-009', 'Slow drain at the clinic entrance', interval '2 days', interval '3 hours', 'CLEARED');
   v_j := pg_temp.job(v_c, 'TN-SAN-2026-002');
 
-  -- S8 a lawful manual clearance, end to end, through the real gate: waiver, crew, gear, readings, authorise, entries, close ---
-  v_c := pg_temp.complaint('CHN-TEY-001', 'Chamber blocked by tree roots; machines could not reach it', interval '6 days', NULL, NULL);
+  -- S8 explicitly educational-only synthetic clearance: not a real-city legal permission or safety claim.
+  v_c := pg_temp.complaint('EDU-ADY-001', 'Synthetic chamber; educational workflow only', interval '6 days', NULL, NULL);
   v_j := pg_temp.job(v_c, 'TN-SAN-2026-002');
-  PERFORM pg_temp.deploy(v_j, 'JET-TEY-01', interval '5 days 6 hours', interval '5 days 5 hours', 'FAILED', interval '5 days 5 hours');
+  INSERT INTO ulb_contractor_scope(ulb_id,contractor_id,assigned_by,assignment_reason)
+    VALUES(v_edu_ulb,pg_temp.cid('TN-SAN-2026-002'),v_edu_eng,'Synthetic educational demo contractor scope assignment') ON CONFLICT DO NOTHING;
+  INSERT INTO ulb_detector_scope(ulb_id,detector_id,assigned_by,assignment_reason)
+    SELECT v_edu_ulb,detector_id,v_edu_eng,'Synthetic educational demo detector scope assignment'
+    FROM gas_detector WHERE serial_no='GD-4G-0001' ON CONFLICT DO NOTHING;
+  PERFORM pg_temp.deploy(v_j, 'EDU-ROB-01', interval '5 days 6 hours', interval '5 days 5 hours', 'FAILED', interval '5 days 5 hours');
   INSERT INTO mechanisation_waiver (job_id, reason_code, justification, approved_by, approved_at)
-  VALUES (v_j, 'MACHINE_FAILED', 'The jetting unit failed twice on a root mass; the chamber is too narrow for the suction unit, so a manual clearance is unavoidable.',
-          v_eng, now() - interval '5 days 4 hours');
-  INSERT INTO entry_permit (job_id, supervisor_id) VALUES (v_j, v_sup) RETURNING permit_id INTO v_p;
-  INSERT INTO permit_crew (permit_id, worker_id, crew_role) VALUES
-    (v_p, pg_temp.wid('NAM-TN-100009'), 'ENTRANT'), (v_p, pg_temp.wid('NAM-TN-100010'), 'ENTRANT'),
-    (v_p, pg_temp.wid('NAM-TN-100011'), 'STANDBY'), (v_p, pg_temp.wid('NAM-TN-100012'), 'SUPERVISOR');
-  INSERT INTO gear_issue (permit_id, worker_id, gear_code, serial_no, issued_by)
-  SELECT v_p, pc.worker_id, g.gear_code, 'SN-' || g.gear_code || '-' || pc.worker_id, v_sup
-    FROM permit_crew pc CROSS JOIN gear_item g WHERE pc.permit_id = v_p AND pc.crew_role = 'ENTRANT' AND g.statutory;
+  VALUES (v_j, 'MACHINE_FAILED', 'Synthetic educational illustration: the simulated machine failed; this exception does not authorize real municipal work.',
+          v_edu_eng, now() - interval '5 days 4 hours');
+  INSERT INTO entry_permit (job_id, supervisor_id) VALUES (v_j, v_edu_sup) RETURNING permit_id INTO v_p;
+  INSERT INTO permit_crew (permit_id, worker_id, crew_role, acknowledged_at, acknowledged_by) VALUES
+    (v_p, pg_temp.wid('NAM-TN-100009'), 'ENTRANT', v_at-interval '2 minutes', pg_temp.uid('edu_worker_1')),
+    (v_p, pg_temp.wid('NAM-TN-100010'), 'ENTRANT', v_at-interval '2 minutes', pg_temp.uid('edu_worker_2')),
+    (v_p, pg_temp.wid('NAM-TN-100011'), 'STANDBY', v_at-interval '2 minutes', pg_temp.uid('edu_worker_3')),
+    (v_p, pg_temp.wid('NAM-TN-100012'), 'SUPERVISOR', v_at-interval '2 minutes', pg_temp.uid('edu_worker_4'));
+  WITH assets AS (
+    INSERT INTO gear_asset(ulb_id,gear_code,serial_no,status,inspection_valid_until)
+    SELECT v_edu_ulb,g.gear_code,format('EDU-S8-%s-%s',pc.worker_id,g.gear_code),'USABLE','2099-12-31'
+      FROM permit_crew pc CROSS JOIN gear_item g
+     WHERE pc.permit_id=v_p AND pc.crew_role='ENTRANT' AND g.statutory AND g.requirement_scope='ENTRANT'
+    RETURNING gear_asset_id,gear_code,serial_no
+  )
+  INSERT INTO gear_issue(permit_id,worker_id,gear_code,serial_no,issued_by,gear_asset_id)
+  SELECT v_p,pc.worker_id,a.gear_code,a.serial_no,v_edu_sup,a.gear_asset_id
+    FROM permit_crew pc JOIN assets a ON a.serial_no=format('EDU-S8-%s-%s',pc.worker_id,a.gear_code)
+   WHERE pc.permit_id=v_p AND pc.crew_role='ENTRANT';
+  WITH asset AS (
+    INSERT INTO gear_asset(ulb_id,gear_code,serial_no,status,inspection_valid_until)
+    VALUES(v_edu_ulb,'FIRST_AID_KIT','EDU-S8-SITE-FIRST-AID','USABLE','2099-12-31') RETURNING gear_asset_id
+  ) INSERT INTO permit_site_gear(permit_id,gear_asset_id,issued_by)
+    SELECT v_p,gear_asset_id,v_edu_sup FROM asset;
+  INSERT INTO permit_readiness(permit_id,kind,passed,recorded_by,recorded_at,expires_at,details,source_mode)
+  SELECT v_p,kind,true,v_edu_sup,v_at-interval '2 minutes',v_at+interval '2 days',
+         CASE kind
+           WHEN 'STRUCTURE' THEN jsonb_build_object('inspection_ref','EDU-S8-STRUCTURE','qualified_person_ref','EDU-S8-QUALIFIED-PERSON')
+           WHEN 'ISOLATION' THEN jsonb_build_object('isolation_ref','EDU-S8-ISOLATION')
+           WHEN 'VENTILATION' THEN jsonb_build_object('opened_at',v_at-interval '3 minutes','method_ref','EDU-S8-VENTILATION-METHOD')
+           WHEN 'RESCUE' THEN jsonb_build_object('plan_ref','EDU-S8-RESCUE-PLAN','retrieval_asset_ref','EDU-S8-RETRIEVAL-ASSET')
+           WHEN 'COMMUNICATION' THEN jsonb_build_object('method_ref','EDU-S8-COMMS-METHOD','test_ref','EDU-S8-COMMS-TEST')
+           WHEN 'TRAFFIC' THEN jsonb_build_object('barrier_ref','EDU-S8-TRAFFIC-BARRIER')
+           WHEN 'MEDICAL' THEN jsonb_build_object('contact_ref','EDU-S8-MEDICAL-CONTACT','first_aid_ref','EDU-S8-FIRST-AID')
+         END || jsonb_build_object('fixture','synthetic educational-only illustration; references are not physical verification'),
+         'SIMULATED'
+    FROM unnest(ARRAY['STRUCTURE','ISOLATION','VENTILATION','RESCUE','COMMUNICATION','TRAFFIC','MEDICAL']) AS kind;
   INSERT INTO gas_reading (permit_id, detector_id, depth_level, o2_pct, h2s_ppm, lel_pct, co_ppm, taken_at, recorded_by)
-  SELECT v_p, d.detector_id, lv, 20.9, 0, 0, 0, v_at - interval '5 minutes', v_sup
+  SELECT v_p, d.detector_id, lv, 20.9, 0, 0, 0, v_at - interval '5 minutes', v_edu_sup
     FROM gas_detector d CROSS JOIN unnest(ARRAY['TOP', 'MID', 'BOTTOM']) AS lv WHERE d.serial_no = 'GD-4G-0001';
-  PERFORM 1 FROM authorise_entry(v_p, v_sup, v_at);
+  PERFORM 1 FROM authorise_entry(v_p, v_edu_sup, v_at);
   IF (SELECT status FROM entry_permit WHERE permit_id = v_p) <> 'AUTHORISED' THEN
     RAISE EXCEPTION 'seed: the lawful permit scenario was not authorised by the gate';
   END IF;
   INSERT INTO entry_log (permit_id, worker_id, period, recorded_by, recorded_at) VALUES
-    (v_p, pg_temp.wid('NAM-TN-100009'), tstzrange(v_at + interval '10 minutes', v_at + interval '55 minutes'), v_sup, v_at + interval '1 hour'),
-    (v_p, pg_temp.wid('NAM-TN-100010'), tstzrange(v_at + interval '15 minutes', v_at + interval '60 minutes'), v_sup, v_at + interval '1 hour');
+    (v_p, pg_temp.wid('NAM-TN-100009'), tstzrange(v_at + interval '10 minutes', v_at + interval '55 minutes'), v_edu_sup, v_at + interval '1 hour'),
+    (v_p, pg_temp.wid('NAM-TN-100010'), tstzrange(v_at + interval '15 minutes', v_at + interval '60 minutes'), v_edu_sup, v_at + interval '1 hour');
   UPDATE entry_permit SET status = 'CLOSED', ended_at = v_at + interval '2 hours' WHERE permit_id = v_p;
   UPDATE job SET status = 'COMPLETED' WHERE job_id = v_j;
   UPDATE complaint SET status = 'RESOLVED', resolved_at = v_at + interval '3 hours', resolution_code = 'CLEARED', resolved_by = v_eng WHERE complaint_id = v_c;
@@ -172,7 +208,7 @@ UPDATE entry_log e
   JOIN job j ON j.job_id = p.job_id
   JOIN complaint c ON c.complaint_id = j.complaint_id
  WHERE e.permit_id = p.permit_id
-   AND c.description = '[seed] Chamber blocked by tree roots; machines could not reach it'
+   AND c.description = '[seed] Synthetic chamber; educational workflow only'
    AND upper(e.period) IS NOT NULL;
 ALTER TABLE entry_log ENABLE TRIGGER trg_entry_log_guard;
 

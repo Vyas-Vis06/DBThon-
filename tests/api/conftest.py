@@ -51,13 +51,22 @@ def build_world(conn) -> dict:
 
     add("admin", "ADMIN")
     add("engineer", "ENGINEER", ulb_id=w["ulb"])
-    add("supervisor", "SUPERVISOR")
-    add("supervisor2", "SUPERVISOR")
+    add("supervisor", "SUPERVISOR", ulb_id=w["ulb"])
+    add("supervisor2", "SUPERVISOR", ulb_id=w["ulb"])
     add("auditor", "AUDITOR")
     add("contractor_a", "CONTRACTOR", contractor_id=w["ca"])
     add("contractor_b", "CONTRACTOR", contractor_id=w["cb"])
     add("worker_a", "WORKER", worker_id=w["workers_a"][0])
+    for index, worker_id in enumerate(w["workers_a"][1:], start=1):
+        add(f"worker_a_{index}", "WORKER", worker_id=worker_id)
     w["users"] = users
+    # Synthetic application fixtures use explicit, auditable tenant ownership rather than staff-wide visibility.
+    for contractor_id in (w["ca"], w["cb"]):
+        f.insert("ulb_contractor_scope", "contractor_id", ulb_id=w["ulb"], contractor_id=contractor_id,
+                 assigned_by=users["admin"]["id"], assignment_reason="Explicit synthetic test-fixture contractor allocation.")
+    conn.execute("INSERT INTO ulb_detector_scope(ulb_id,detector_id,assigned_by,assignment_reason) "
+                 "VALUES (%s,%s,%s,%s)",
+                 (w["ulb"], w["detector"], users["admin"]["id"], "Explicit synthetic test-fixture detector allocation."))
     return w
 
 

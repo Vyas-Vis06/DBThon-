@@ -27,6 +27,8 @@ def test_maintenance_commits_stop_even_if_detection_fails(db, conn):
         result = run_maintenance(engine)
         assert result["safety"] == {"stopped": 1}
         assert "error" in result["detection"]
+        assert result["completion"] == {"processed_count": 0, "next_after_job_id": 0, "has_more": False}
+        assert result["completion_cursor"] == 0
         assert conn.execute("SELECT status FROM entry_permit WHERE permit_id=%s", (permit,)).fetchone()["status"] == "ABORTED"
         assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE permit_id=%s", (permit,)).fetchone()["n"] >= 1
         assert run_maintenance(engine)["safety"] == {"stopped": 0}
@@ -46,3 +48,4 @@ def test_lifespan_tick_stops_expired_permit_without_an_http_write(db, conn):
             time.sleep(.02)
         assert status == "ABORTED"
     assert app.state.maintenance["safety"]["stopped"] == 1
+    assert "completion" in app.state.maintenance

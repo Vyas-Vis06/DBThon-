@@ -2,6 +2,23 @@
 
 Newest entry first. Resume from the latest entry; do not reconstruct the plan from chat history.
 
+## 2026-10-08 · ZE2 integrated release
+
+Three GPT-6 Luna lanes extended the independently verified 574-test foundation. The complete frozen tree passed
+**617 tests, zero failures/errors/skips, including three real-browser scenarios** in 132.99 seconds on Windows,
+Python 3.12.14 and embedded PostgreSQL 16.2. See [source-bound evidence](../evidence/current.json).
+Remote CI results are not established by this local run.
+
+There are 50 application tables, 97 foreign keys and 16 migrations. Original migrations 0001-0014 remain unchanged.
+New gates cover actual acknowledgements, complete readiness/gas, serial occupancy, policy eligibility and current
+receipts. Other additions include completion reconciliation with clock-aware projections, standalone multi-victim
+reports, durable command keys and scoped replay. Existing temporal evidence review and source-specific holds remain.
+Raw writes, stale snapshots and post-lock clocks have regression tests. All six LAB areas have executed evidence,
+including explicit cursor handling and assertion-style constraint triggers, not unsupported CREATE ASSERTION syntax.
+
+See [release handoff](ZE2_RELEASE.md) for startup, rehearsal and bounded novelty. The user authorized a local commit,
+a separate GitHub branch and integration into the unchanged Desktop download, not a merge into main.
+
 ---
 
 ## 2026-10-07 · Audit hardening, preserved decisions and presentation evidence

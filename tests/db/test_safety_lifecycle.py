@@ -122,7 +122,7 @@ def test_permit_and_crew_parent_ids_cannot_be_reassigned_by_runtime_raw_sql(db, 
     f = Factory(conn)
     s = current_permit(conn, f)
     with db.connect(user="ze_app") as app:
-        act_as(app, s["supervisor"], "SUPERVISOR")
+        act_as(app, s["supervisor"], "SUPERVISOR", ulb_id=s["ulb"])
         with expect("ZE003", "identifiers are immutable"):
             app.execute("UPDATE permit_crew SET permit_id = 999999 WHERE permit_id = %s AND worker_id = %s", (s["permit"], s["e1"]))
         with expect("ZE003", "identifiers are immutable"):

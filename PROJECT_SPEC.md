@@ -6,6 +6,31 @@ If another document disagrees with this one, this one wins. Design and schema li
 
 Rule IDs (`BR-nn`) are stable. Code, SQL comments and tests cite them.
 
+## ZE-2 integration amendment
+
+The additive integration contract is [INTEGRATION_CONTRACT](docs/development/INTEGRATION_CONTRACT.md).
+It refines older descriptions below without replacing stable IDs or the original workflow:
+
+* Unknown or real ULB policy defaults to `REVIEW_REQUIRED`. Complete safety evidence does not override jurisdiction
+  eligibility. Only a visibly labelled `EDUCATIONAL` scope demonstrates successful manual-entry authorization;
+  it is not a field-deployable legal permission.
+* Assigned crew are not automatically actual participants. Acknowledgment, current typed readiness evidence, shared
+  site equipment and exclusive allocation of every crew member/serial asset supplement the existing gate.
+* Nullable gas channels and typed/simulated/raw provenance must remain distinguishable from validated instrument truth.
+* Positive and denied decision receipts supplement, rather than replace, the original successful snapshot. Current
+  revision and expiry are admission controls; stored historical completion evidence is not rewritten by aging.
+* Imported completion claims are separate from internal clearance evidence. An unmatched claim or conflicting closure
+  is a reviewable discrepancy, not proof that somebody entered a sewer.
+* Standalone multi-victim incident intake accepts unregistered people and unknown registry links. Pending assessment
+  references are not awards or payments. Existing legacy consequence routines remain a bounded demo policy; their
+  internal holds/statuses are not external legal sanctions or actual disbursement.
+* Exact-key command receipts and commit-ordered scoped event replay share the business transaction. Browser refresh
+  is recoverable from stored events; no network notification is represented as durable evidence.
+
+The historical ZE-1 material under `docs/plan/` contains alternative UUID/React/JWT contracts and proposed paths.
+Those alternatives do not override this repository's bigint keys, public schema, opaque sessions, static UI,
+terminal `ABORTED` lifecycle, complaint-anchored late-evidence review or source-specific invoice holds.
+
 ---
 
 ## 1. Problem statement and how it was interpreted
@@ -171,7 +196,8 @@ Marked `is_assumption = true` in `rule_parameter` and shown as such in the admin
 * Deleting is restricted: evidence tables (readings, entries, waivers, incidents, audit) cannot be deleted; permits
   with readings cannot be deleted, only cancelled.
 * Out of scope: GIS/map UI, real sensor integration (the demo uses typed/simulated readings), payment gateways,
-  SMS/e-mail, ULB-scoped visibility (all `ENGINEER`/`SUPERVISOR` users see all ULBs).
+  SMS/e-mail and independently verified deployment. ZE-2 adds ULB-scoped operational visibility for
+  `ENGINEER`/`SUPERVISOR`; onboarding and cross-scope audit boundaries are documented separately.
 
 ## 8. Realistic end-to-end use cases
 

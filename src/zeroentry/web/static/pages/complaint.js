@@ -2,7 +2,7 @@ import { api, badge, fmtDT, form, h, isRole, kv, options, table, toast } from '/
 
 const REASONS = ['MACHINE_FAILED', 'NO_MACHINE_ACCESS', 'STRUCTURAL_CONSTRAINT', 'NO_MACHINE_AVAILABLE', 'OTHER'];
 const RESOLUTIONS = [
-  ['CLEARED', 'Cleared (machine or authorised manual entry)'], ['NO_BLOCKAGE_FOUND', 'No blockage found'],
+  ['CLEARED', 'Reported cleared (machine or recorded permit evidence)'], ['NO_BLOCKAGE_FOUND', 'No blockage found'],
   ['DUPLICATE_COMPLAINT', 'Duplicate complaint'], ['REFERRED_OUT', 'Referred to another agency'], ['WITHDRAWN', 'Withdrawn by complainant'],
 ];
 
@@ -53,7 +53,7 @@ export default async function (root, { params }) {
     if (waiver) {
       panel.append(h('p', {}, badge(waiver.reason_code), ' approved ', fmtDT(waiver.approved_at)), h('blockquote', {}, waiver.justification));
     } else {
-      panel.append(h('p', { class: 'muted' }, 'None. No entry permit can be drafted until the Responsible Sanitation Authority records in writing why no machine can do the job.'));
+      panel.append(h('p', { class: 'muted' }, 'None. No permit draft can be made until the Responsible Sanitation Authority records why no machine can do the job. A waiver does not change DENIED or REVIEW_REQUIRED policy.'));
       if (isRole('ENGINEER')) {
         panel.append(h('details', {}, h('summary', {}, 'File a waiver (engineers only)'), form([
           { name: 'reason_code', label: 'Reason', type: 'select', required: true, options: REASONS.map((r) => ({ value: r, label: r.replaceAll('_', ' ') })),
@@ -82,7 +82,7 @@ export default async function (root, { params }) {
 
     if (c.status !== 'RESOLVED') {
       root.append(h('h2', {}, 'Resolve this complaint'), h('div', { class: 'panel' },
-        h('p', { class: 'muted' }, 'Resolving is not blocked when no clearance evidence exists: the gap is exactly what the absence scan looks for.'),
+        h('p', { class: 'muted' }, 'A complaint may be marked as reported resolved before system clearance evidence exists. That missing evidence creates a reviewable gap; it does not prove an entry or misconduct.'),
         form([{ name: 'resolution_code', label: 'Resolution', type: 'select', required: true, options: RESOLUTIONS.map(([value, label]) => ({ value, label })) }],
           async (v) => {
             const r = await api('POST', `/complaints/${c.complaint_id}/resolve`, v);

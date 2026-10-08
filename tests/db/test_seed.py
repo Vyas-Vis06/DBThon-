@@ -11,7 +11,7 @@ def _seed(db, **kw):
 
 def test_seed_creates_the_documented_demo_world(db, conn):
     counts = _seed(db)
-    assert counts == {"ulb": 3, "manhole": 60, "contractor": 5, "worker": 40, "machine": 4, "gas_detector": 2, "app_user": 6}
+    assert counts == {"ulb": 4, "manhole": 61, "contractor": 5, "worker": 40, "machine": 5, "gas_detector": 2, "app_user": 12}
     q = lambda sql: conn.execute(sql).fetchone()["n"]  # noqa: E731
     assert q("SELECT count(*) AS n FROM gas_detector WHERE calibration_valid_until < '2026-10-01'") == 1
     assert q("SELECT count(*) AS n FROM manhole WHERE kind = 'SEPTIC'") == 12
@@ -25,16 +25,20 @@ def test_seed_is_idempotent(db):
     assert _seed(db) == first
 
 
-def test_demo_users_are_scoped_hashed_and_cover_all_six_roles(db, conn):
+def test_demo_users_are_scoped_hashed_and_cover_all_roles_including_explicit_education(db, conn):
     _seed(db)
     rows = conn.execute("""SELECT r.name AS role, u.email, u.password_hash, u.contractor_id, u.worker_id
                            FROM app_user u JOIN role r USING (role_id) ORDER BY r.name""").fetchall()
-    assert [r["role"] for r in rows] == ["ADMIN", "AUDITOR", "CONTRACTOR", "ENGINEER", "SUPERVISOR", "WORKER"]
+    assert {r["role"] for r in rows} == {"ADMIN", "AUDITOR", "CONTRACTOR", "ENGINEER", "SUPERVISOR", "WORKER"}
     assert all(r["email"].endswith("@zeroentry.example") for r in rows)
     assert all(r["password_hash"].startswith("$2") and PASSWORD not in r["password_hash"] for r in rows)
     by_role = {r["role"]: r for r in rows}
     assert by_role["CONTRACTOR"]["contractor_id"] is not None and by_role["WORKER"]["worker_id"] is not None
     assert by_role["ADMIN"]["contractor_id"] is None
+    policy = {r["name"]: r["policy_mode"] for r in conn.execute("SELECT name,policy_mode FROM ulb")}
+    assert policy["EDUCATIONAL LAB - Synthetic Adyar"] == "EDUCATIONAL"
+    assert all(policy[name] == "REVIEW_REQUIRED" for name in (
+        "GCC Zone 4 - Tondiarpet", "GCC Zone 9 - Teynampet", "GCC Zone 13 - Adyar"))
 
 
 def test_the_demo_scenarios_produce_exactly_the_detections_the_story_promises(db, conn):
@@ -58,10 +62,16 @@ def test_the_demo_scenarios_produce_exactly_the_detections_the_story_promises(db
 def test_the_demo_world_has_a_lawful_permit_a_denied_draft_and_consequences_on_record(db, conn):
     _seed(db)
     permits = {r["status"]: r["n"] for r in conn.execute("SELECT status, count(*) AS n FROM entry_permit GROUP BY status")}
-    assert permits == {"CLOSED": 1, "DRAFT": 1}                                        # the closed one went through the real gate
+    assert permits == {"CLOSED": 1, "DRAFT": 1}                                        # closed only in explicitly synthetic EDU scope
+    assert conn.execute("SELECT u.policy_mode FROM entry_permit p JOIN job j USING(job_id) "
+                        "JOIN complaint c USING(complaint_id) JOIN manhole m USING(manhole_id) "
+                        "JOIN ulb u USING(ulb_id) WHERE p.status='CLOSED'").fetchone()["policy_mode"] == "EDUCATIONAL"
     draft = conn.execute("SELECT * FROM v_permit_compliance").fetchone()
     assert draft["ready_to_authorise"] is False
-    assert set(draft["failing_clauses"].split(", ")) == {"CREW_STANDBY", "GEAR_ALL", "GAS_TOP", "GAS_MID", "GAS_BOTTOM"}
+    assert set(draft["failing_clauses"].split(", ")) == {
+        "POLICY_ELIGIBILITY", "CREW_ACK", "CREW_STANDBY", "GEAR_ALL", "SITE_GEAR", "READINESS",
+        "GEAR_ASSET", "GAS_COMPLETE_SOURCE", "GAS_TOP", "GAS_MID", "GAS_BOTTOM",
+    }
     status = {r["licence_no"]: r["status"] for r in conn.execute("SELECT licence_no, status FROM contractor")}
     assert status["TN-SAN-2026-004"] == "BLACKLISTED" and status["TN-SAN-2026-005"] == "SUSPENDED" and status["TN-SAN-2026-001"] == "ACTIVE"
     overdue = conn.execute("SELECT count(*) AS n, sum(amount_outstanding) AS owed FROM v_compensation_overdue").fetchone()

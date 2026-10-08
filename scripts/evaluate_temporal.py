@@ -35,6 +35,7 @@ sys.path.insert(0, str(ROOT))
 
 from tests.factories import Factory  # noqa: E402 - deterministic synthetic fixtures shared with tests
 from zeroentry.db import url_for  # noqa: E402
+from zeroentry.evidence import source_fingerprint  # noqa: E402
 
 BASELINE = """
 SELECT c.complaint_id FROM complaint c
@@ -56,7 +57,7 @@ LABELS = {0: "timely_machine", 1: "missing_evidence", 2: "exempt_resolution", 3:
 def fixture(conn, size):
     f = Factory(conn)
     ulb = f.ulb(name=f"Synthetic scale {size}")
-    mh, contractor, engineer = f.manhole(ulb), f.contractor(), f.user("ENGINEER")
+    mh, contractor, engineer = f.manhole(ulb), f.contractor(), f.user("ENGINEER", ulb_id=ulb)
     machine = f.machine(ulb)
     with conn.transaction():
         conn.execute("""INSERT INTO complaint (manhole_id, description, status, raised_at, resolved_at, resolution_code)
@@ -86,7 +87,7 @@ def fixture(conn, size):
             WHERE outcome IS NULL""")
     conn.execute("ANALYZE")
     labels = conn.execute("SELECT * FROM benchmark_labels ORDER BY complaint_id").fetchall()
-    return engineer, labels
+    return engineer, ulb, labels
 
 
 def confusion(labels, predicted):
@@ -124,11 +125,12 @@ def run_size(server, size, repeats):
         admin.execute(f'CREATE DATABASE "{name}" TEMPLATE ze_eval_template')
     with psycopg.connect(make_conninfo(server.get_uri(), dbname=name), autocommit=True, row_factory=dict_row) as owner:
         start = perf_counter()
-        engineer, labels = fixture(owner, size)
+        engineer, ulb, labels = fixture(owner, size)
         load_ms = (perf_counter() - start) * 1000
     with psycopg.connect(make_conninfo(server.get_uri(), dbname=name, user="ze_app", password="synthetic_eval_only"),
                         autocommit=True, row_factory=dict_row) as conn:
-        conn.execute("SELECT set_config('app.role', 'ENGINEER', false), set_config('app.user_id', %s, false)", (str(engineer),))
+        conn.execute("SELECT set_config('app.role', 'ENGINEER', false), set_config('app.user_id', %s, false), "
+                     "set_config('app.ulb_id', %s, false)", (str(engineer), str(ulb)))
         results = {}
         for key, query in (("untimed_baseline", BASELINE), ("zeroentry_se1", ADVANCED)):
             timing, predicted = measure(conn, query, repeats)
@@ -154,7 +156,8 @@ def run_size(server, size, repeats):
 def markdown(report):
     lines = ["# Synthetic evidence evaluation", "", f"Measured {report['measured_at']} on {report['platform']}; "
              f"Python {report['python']}, PostgreSQL {report['postgres']}, commit {report['commit']} "
-             "plus working-tree changes described in the PR.", "", "All data is synthetic. Six evenly interleaved categories: timely, missing, exempt, late, "
+             f"(dirty={report['dirty']}, schema={report['schema_revision']}). Source fingerprint: "
+             f"`{report['source_fingerprint']}`.", "", "All data is synthetic. Six evenly interleaved categories: timely, missing, exempt, late, "
              "unfinished-finalized-late and pending. Metrics classify evidence gaps, not physical human entries. "
              "The baseline lacks temporal/applicability semantics; timing differences do not prove equal-task speedup. "
              "Warm-cache local single-client measurements; no network or field workload.", "",
@@ -167,7 +170,7 @@ def markdown(report):
                      f"{z['p50_ms']:.2f} / {z['p95_ms']:.2f} | {s['first_ms']:.2f} / {s['repeat_ms']:.2f} |")
     lines += ["", "Raw confusion matrices, per-category results, each sample, row counts and EXPLAIN plans "
               "are in results.json. Reproduce from a Python 3.11/3.12 source checkout:", "",
-              "```sh", "python scripts/evaluate_temporal.py --sizes 1000 10000 100000 --repeats 7", "```", "",
+              "```sh", report["command"], "```", "",
               "SE2 division, concurrency and authorization correctness are covered separately by the real-PG regression suite. "
               "This experiment evaluates SE1 only; it does not benchmark an incremental cache or authenticated instruments.", ""]
     return "\n".join(lines)
@@ -185,6 +188,10 @@ def main():
               "python": platform.python_version(), "commit": subprocess.check_output(
                   ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "repeats": args.repeats, "queries": {"untimed_baseline": BASELINE, "zeroentry_se1": ADVANCED}, "results": []}
+    report["dirty"] = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())
+    report["source_fingerprint"] = source_fingerprint()
+    report["schema_revision"] = sorted((ROOT / "database/migrations/versions").glob("[0-9]*.py"))[-1].stem.split("_", 1)[0]
+    report["command"] = "python scripts/evaluate_temporal.py --sizes " + " ".join(map(str, args.sizes)) + f" --repeats {args.repeats}"
     report["source_sha256"] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                                for p in [Path(__file__).resolve(), *sorted((ROOT / "database/migrations/sql").glob("*.sql"))]}
     with tempfile.TemporaryDirectory(prefix="ze_evaluation_") as tmp:

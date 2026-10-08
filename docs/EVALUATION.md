@@ -70,11 +70,23 @@ speed comparison or a substitute for E1-E4. Its run metadata identifies the meas
 
 ## What the evaluation does not prove
 
+### E5: identical-policy preview/write interleaving
+
+`python scripts/evaluate_preview.py --out -` creates its own disposable cluster and compares an implemented minimal
+application-side preview-then-write flow with database revalidation. Both use exactly the same configured predicate:
+ordinary passing and failing decisions therefore agree. Removing required personal gear between preview and write
+exposes the stale-preview gap. Only the comparator trial disables the permit table's user triggers, inside an
+owner-controlled transaction that rolls back and restores them; other constraints and guards remain enabled.
+`tests/db/test_preview_comparison.py` verifies parity, outcomes, rollback and trigger restoration.
+This is a bounded architectural comparison, not a commercial-product benchmark or a claim that applications cannot
+solve the race: an application that obtains correct shared locks and rechecks can also maintain the invariant.
+No speed claim is made. The JSON report includes the actual schema fingerprint, environment and limitations.
+
 * **Synthetic data.** E1 measures fidelity to configured evidence-gap labels, not physical-entry truth or accuracy on real ULB
   records. Real-world performance depends on source-system coverage and the correctness of records; a read-only pilot is next.
 * **The baselines are bounded.** The naive anti-join is the team's earlier proposal, not an industry-wide query benchmark. The
-  E2 baseline models rules enforced only in one application while other database clients can write directly; it is not a
-  comparison against every production system.
+  E2 baseline is a controlled unguarded-database ablation: it does not actually implement an application validator and
+  cannot establish superiority over one. It isolates trigger enforcement on writes that bypass application checks.
 * **One machine, default settings.** Timings come from one development laptop running the embedded PostgreSQL 16 with default
   settings and a warm local cache. Buffer counts and wall times depend on dataset, schema and hardware and are not production
   capacity guarantees.

@@ -15,12 +15,14 @@ from sqlalchemy import Engine, text
 log = logging.getLogger("zeroentry.maintenance")
 
 
-def run_maintenance(engine: Engine) -> dict:
+def run_maintenance(engine: Engine, completion_after_job_id: int = 0) -> dict:
     result = {}
+    completion_cursor = completion_after_job_id
     # Commit safety independently: a detection scan failure must not roll back a stop decision.
     for key, query, lock_key in (
         ("safety", "SELECT sweep_permit_safety() AS stopped", 920260701),
         ("detection", "SELECT * FROM scan_shadow_entries(now())", 920260702),
+        ("completion", "SELECT * FROM sweep_completion_projections(:after_job_id, 500)", 920260703),
     ):
         try:
             with engine.begin() as conn:
@@ -30,17 +32,23 @@ def run_maintenance(engine: Engine) -> dict:
                     result[key] = {"skipped": "another maintenance process is running"}
                     continue
                 conn.execute(text("SELECT set_config('app.role', 'ADMIN', true)"))
-                result[key] = dict(conn.execute(text(query)).mappings().one())
+                params = {"after_job_id": completion_after_job_id} if key == "completion" else {}
+                result[key] = dict(conn.execute(text(query), params).mappings().one())
+                if key == "completion":
+                    completion_cursor = result[key]["next_after_job_id"] if result[key]["has_more"] else 0
         except Exception:
             log.exception("%s maintenance failed; next tick will retry", key)
             result[key] = {"error": "database maintenance failed"}
+    result["completion_cursor"] = completion_cursor
     result["checked_at"] = datetime.now(timezone.utc).isoformat()
     return result
 
 
 async def maintain(engine: Engine, interval: int, stop: asyncio.Event, status: dict) -> None:
     while not stop.is_set():
-        status.update(await asyncio.to_thread(run_maintenance, engine))
+        status.update(await asyncio.to_thread(
+            run_maintenance, engine, int(status.get("completion_cursor", 0))
+        ))
         try:
             await asyncio.wait_for(stop.wait(), timeout=interval)
         except TimeoutError:

@@ -4,7 +4,7 @@ const short = (s, n = 70) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
 export default async function (root) {
   root.append(h('h1', {}, 'Complaints'),
-    h('p', { class: 'muted' }, 'Blockage complaints against manholes. Every complaint is cleared mechanised-first; a manual entry is an exception that needs a written waiver.'));
+    h('p', { class: 'muted' }, 'Blockage complaints against municipal sites. Work is mechanised-first. A waiver records an exception request but cannot override a DENIED or REVIEW_REQUIRED scope policy.'));
 
   const ulbs = await options('/ulbs?limit=200', (u) => [u.ulb_id, u.name]);
   const filters = { status: '', ulb_id: '', q: '', offset: 0 };

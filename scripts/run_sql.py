@@ -23,10 +23,13 @@ def table(columns: list[str], rows: list[tuple]) -> str:
     return "\n".join([line(columns), "-+-".join("-" * w for w in widths), *(line(r) for r in cells), f"({len(rows)} row{'s' if len(rows) != 1 else ''})"])
 
 
-def dsn_for_dev() -> str:
+def dsn_for_dev(data_dir: Path | None = None) -> str:
     import pgserver
     from psycopg.conninfo import make_conninfo
-    server = pgserver.get_server(ROOT / ".pgdata" / "cluster", cleanup_mode=None)      # attaches to the running dev database
+    cluster = (data_dir or ROOT / ".pgdata").resolve() / "cluster"
+    if not (cluster / "PG_VERSION").is_file():
+        raise FileNotFoundError("No initialized demo cluster at the selected data directory; start scripts/dev.py there first.")
+    server = pgserver.get_server(cluster, cleanup_mode=None)      # attaches only to the explicitly selected dev database
     return make_conninfo(server.get_uri(), dbname="zeroentry")
 
 
@@ -34,9 +37,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("file")
     parser.add_argument("--url", help="postgresql://... instead of the embedded dev database")
+    parser.add_argument("--data-dir", type=Path, default=ROOT / ".pgdata", help="Match scripts/dev.py's isolated demo directory")
     args = parser.parse_args()
     script = Path(args.file).read_text(encoding="utf-8")
-    dsn = args.url or dsn_for_dev()
+    dsn = args.url or dsn_for_dev(args.data_dir)
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.add_notice_handler(lambda n: print(f"NOTICE: {n.message_primary}"))
         cur = conn.cursor()

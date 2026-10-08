@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlalchemy import (BigInteger, Boolean, Date, DateTime, FetchedValue, ForeignKey, ForeignKeyConstraint,
                         Integer, LargeBinary, Numeric, SmallInteger, Text)
-from sqlalchemy.dialects.postgresql import JSONB, TSTZRANGE, Range
+from sqlalchemy.dialects.postgresql import JSONB, TSTZRANGE, UUID, Range
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 TS = DateTime(timezone=True)
@@ -47,6 +47,7 @@ class Ulb(Base):
     name: Mapped[str] = mapped_column(Text)
     district: Mapped[str] = mapped_column(Text)
     state: Mapped[str] = mapped_column(Text)
+    policy_mode: Mapped[str] = mapped_column(Text, server_default=DB)
 
 
 class Contractor(Base):
@@ -185,6 +186,7 @@ class EntryPermit(Base):
     valid_until: Mapped[datetime | None] = mapped_column(TS)
     ended_at: Mapped[datetime | None] = mapped_column(TS)
     end_reason: Mapped[str | None] = mapped_column(Text)
+    evidence_revision: Mapped[int] = mapped_column(BigInteger, server_default=DB)
 
 
 class PermitCrew(Base):
@@ -192,6 +194,8 @@ class PermitCrew(Base):
     permit_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("entry_permit.permit_id"), primary_key=True)
     worker_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("worker.worker_id"), primary_key=True)
     crew_role: Mapped[str] = mapped_column(Text)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(TS)
+    acknowledged_by: Mapped[int | None] = _fk("app_user.user_id", nullable=True)
 
 
 class GearItem(Base):
@@ -200,6 +204,7 @@ class GearItem(Base):
     name: Mapped[str] = mapped_column(Text)
     statutory: Mapped[bool] = mapped_column(Boolean, server_default=DB)
     legal_ref: Mapped[str | None] = mapped_column(Text)
+    requirement_scope: Mapped[str] = mapped_column(Text, server_default=DB)
 
 
 class GearIssue(Base):
@@ -212,6 +217,7 @@ class GearIssue(Base):
     serial_no: Mapped[str] = mapped_column(Text)
     issued_by: Mapped[int | None] = _fk("app_user.user_id", nullable=True)
     issued_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    gear_asset_id: Mapped[int | None] = _fk("gear_asset.gear_asset_id", nullable=True)
 
 
 class GasDetector(Base):
@@ -228,13 +234,14 @@ class GasReading(Base):
     permit_id: Mapped[int] = _fk("entry_permit.permit_id")
     detector_id: Mapped[int] = _fk("gas_detector.detector_id")
     depth_level: Mapped[str] = mapped_column(Text)
-    o2_pct: Mapped[Decimal] = mapped_column(Numeric(4, 1))
-    h2s_ppm: Mapped[Decimal] = mapped_column(Numeric(6, 2))
-    lel_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2))
-    co_ppm: Mapped[Decimal] = mapped_column(Numeric(6, 2))
+    o2_pct: Mapped[Decimal | None] = mapped_column(Numeric(4, 1))
+    h2s_ppm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    lel_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    co_ppm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
     taken_at: Mapped[datetime] = mapped_column(TS)
     recorded_by: Mapped[int] = _fk("app_user.user_id")
     recorded_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    source_mode: Mapped[str] = mapped_column(Text, server_default=DB)
 
 
 class EntryLog(Base):
@@ -247,6 +254,7 @@ class EntryLog(Base):
     recorded_by: Mapped[int] = _fk("app_user.user_id")
     recorded_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
     exit_recorded_at: Mapped[datetime | None] = mapped_column(TS, server_default=DB, server_onupdate=DB)
+    receipt_id: Mapped[int | None] = _fk("permit_decision_receipt.receipt_id", nullable=True)
 
 
 # --- consequences ----------------------------------------------------------------------------------
@@ -301,6 +309,7 @@ class InvoiceHold(Base):
     reason: Mapped[str] = mapped_column(Text)
     alert_id: Mapped[int | None] = _fk("shadow_entry_alert.alert_id", nullable=True)
     incident_id: Mapped[int | None] = _fk("incident.incident_id", nullable=True)
+    report_id: Mapped[int | None] = _fk("incident_report.report_id", nullable=True)
     placed_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
     released_at: Mapped[datetime | None] = mapped_column(TS)
     released_by: Mapped[int | None] = _fk("app_user.user_id", nullable=True)
@@ -436,3 +445,181 @@ class AuditLog(Base):
     row_pk: Mapped[str] = mapped_column(Text)
     old_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     new_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+
+# --- added permit evidence, resource occupancy and reconciliation ----------------------------------
+class GearAsset(Base):
+    __tablename__ = "gear_asset"
+    gear_asset_id: Mapped[int] = _pk()
+    ulb_id: Mapped[int] = _fk("ulb.ulb_id")
+    gear_code: Mapped[str] = mapped_column(Text, ForeignKey("gear_item.gear_code"))
+    serial_no: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, server_default=DB)
+    inspection_valid_until: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class PermitSiteGear(Base):
+    __tablename__ = "permit_site_gear"
+    site_gear_id: Mapped[int] = _pk()
+    permit_id: Mapped[int] = _fk("entry_permit.permit_id")
+    gear_asset_id: Mapped[int] = _fk("gear_asset.gear_asset_id")
+    issued_by: Mapped[int | None] = _fk("app_user.user_id", nullable=True)
+    issued_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    returned_at: Mapped[datetime | None] = mapped_column(TS)
+
+
+class PermitReadiness(Base):
+    __tablename__ = "permit_readiness"
+    readiness_id: Mapped[int] = _pk()
+    permit_id: Mapped[int] = _fk("entry_permit.permit_id")
+    kind: Mapped[str] = mapped_column(Text)
+    passed: Mapped[bool] = mapped_column(Boolean)
+    recorded_by: Mapped[int] = _fk("app_user.user_id")
+    recorded_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    expires_at: Mapped[datetime] = mapped_column(TS)
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=DB)
+    source_mode: Mapped[str] = mapped_column(Text, server_default=DB)
+
+
+class PermitResourceReservation(Base):
+    __tablename__ = "permit_resource_reservation"
+    reservation_id: Mapped[int] = _pk()
+    permit_id: Mapped[int] = _fk("entry_permit.permit_id")
+    worker_id: Mapped[int | None] = _fk("worker.worker_id", nullable=True)
+    gear_asset_id: Mapped[int | None] = _fk("gear_asset.gear_asset_id", nullable=True)
+    acquired_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    released_at: Mapped[datetime | None] = mapped_column(TS)
+    release_reason: Mapped[str | None] = mapped_column(Text)
+
+
+class PermitDecisionReceipt(Base):
+    __tablename__ = "permit_decision_receipt"
+    receipt_id: Mapped[int] = _pk()
+    permit_id: Mapped[int] = _fk("entry_permit.permit_id")
+    evidence_revision: Mapped[int] = mapped_column(BigInteger)
+    decision: Mapped[str] = mapped_column(Text)
+    evaluated_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    expires_at: Mapped[datetime | None] = mapped_column(TS)
+    failures: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=DB)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=DB)
+    snapshot_sha256: Mapped[str] = mapped_column(Text)
+
+
+class CompletionClaim(Base):
+    __tablename__ = "completion_claim"
+    claim_id: Mapped[int] = _pk()
+    source_ulb_id: Mapped[int] = _fk("ulb.ulb_id")
+    source: Mapped[str] = mapped_column(Text)
+    external_id: Mapped[str] = mapped_column(Text)
+    external_job_ref: Mapped[str] = mapped_column(Text)
+    matched_job_id: Mapped[int | None] = _fk("job.job_id", nullable=True)
+    claimed_status: Mapped[str] = mapped_column(Text)
+    claimed_at: Mapped[datetime] = mapped_column(TS)
+    received_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=DB)
+    match_status: Mapped[str] = mapped_column(Text, server_default=DB)
+
+
+class CompletionProjection(Base):
+    __tablename__ = "completion_projection"
+    job_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("job.job_id"), primary_key=True)
+    evidence_revision: Mapped[int] = mapped_column(BigInteger, server_default=DB)
+    gap_codes: Mapped[list[str]] = mapped_column(JSONB, server_default=DB)
+    has_gap: Mapped[bool] = mapped_column(Boolean, server_default=DB)
+    disposition: Mapped[str] = mapped_column(Text, server_default=DB)
+    computed_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    reviewed_by: Mapped[int | None] = _fk("app_user.user_id", nullable=True)
+    review_reason: Mapped[str | None] = mapped_column(Text)
+
+
+# --- backend-owned command, event and standalone incident relations --------------------------------
+class CommandDedup(Base):
+    __tablename__ = "command_dedup"
+    dedup_id: Mapped[int] = _pk()
+    actor_user_id: Mapped[int] = _fk("app_user.user_id")
+    operation: Mapped[str] = mapped_column(Text)
+    idempotency_key: Mapped[Any] = mapped_column(UUID(as_uuid=True))
+    body_sha256: Mapped[str] = mapped_column(Text)
+    response_status: Mapped[int] = mapped_column(SmallInteger)
+    response_json: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class OutboxScopeCounter(Base):
+    __tablename__ = "outbox_scope_counter"
+    ulb_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ulb.ulb_id"), primary_key=True)
+    last_seq: Mapped[int] = mapped_column(BigInteger, server_default=DB)
+
+
+class OutboxEvent(Base):
+    __tablename__ = "outbox_event"
+    event_id: Mapped[int] = _pk()
+    ulb_id: Mapped[int] = _fk("ulb.ulb_id")
+    event_seq: Mapped[int] = mapped_column(BigInteger)
+    event_type: Mapped[str] = mapped_column(Text)
+    entity_type: Mapped[str] = mapped_column(Text)
+    entity_id: Mapped[int | None] = mapped_column(BigInteger)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=DB)
+    occurred_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class IncidentReport(Base):
+    __tablename__ = "incident_report"
+    report_id: Mapped[int] = _pk()
+    ulb_id: Mapped[int] = _fk("ulb.ulb_id")
+    job_id: Mapped[int | None] = _fk("job.job_id", nullable=True)
+    permit_id: Mapped[int | None] = _fk("entry_permit.permit_id", nullable=True)
+    contractor_id: Mapped[int | None] = _fk("contractor.contractor_id", nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(TS)
+    site_label: Mapped[str] = mapped_column(Text)
+    hazard_type: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    reported_sections: Mapped[str | None] = mapped_column(Text)
+    reported_by: Mapped[int] = _fk("app_user.user_id")
+    classification_status: Mapped[str] = mapped_column(Text, server_default=DB)
+    source_mode: Mapped[str] = mapped_column(Text, server_default=DB)
+    created_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class IncidentReportVictim(Base):
+    __tablename__ = "incident_report_victim"
+    victim_id: Mapped[int] = _pk()
+    report_id: Mapped[int] = _fk("incident_report.report_id")
+    victim_key: Mapped[str] = mapped_column(Text)
+    worker_id: Mapped[int | None] = _fk("worker.worker_id", nullable=True)
+    display_alias: Mapped[str] = mapped_column(Text)
+    outcome: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class IncidentAssessmentCase(Base):
+    __tablename__ = "incident_assessment_case"
+    assessment_case_id: Mapped[int] = _pk()
+    victim_id: Mapped[int] = _fk("incident_report_victim.victim_id")
+    status: Mapped[str] = mapped_column(Text, server_default=DB)
+    reference_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    claimed_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    awarded_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    paid_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default=DB)
+    review_due_at: Mapped[datetime | None] = mapped_column(TS)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+
+
+class UlbContractorScope(Base):
+    __tablename__ = "ulb_contractor_scope"
+    ulb_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ulb.ulb_id", ondelete="RESTRICT"), primary_key=True)
+    contractor_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contractor.contractor_id", ondelete="RESTRICT"), primary_key=True)
+    assigned_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("app_user.user_id", ondelete="RESTRICT"))
+    assigned_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    assignment_reason: Mapped[str] = mapped_column(Text)
+
+
+class UlbDetectorScope(Base):
+    __tablename__ = "ulb_detector_scope"
+    ulb_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ulb.ulb_id", ondelete="RESTRICT"), primary_key=True)
+    detector_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("gas_detector.detector_id", ondelete="RESTRICT"), primary_key=True)
+    assigned_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("app_user.user_id", ondelete="RESTRICT"))
+    assigned_at: Mapped[datetime] = mapped_column(TS, server_default=DB)
+    assignment_reason: Mapped[str] = mapped_column(Text)

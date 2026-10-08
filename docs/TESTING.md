@@ -4,6 +4,17 @@
 
 ## Run them
 
+For source-bound judge evidence use `python scripts/verify_release.py --workers 4`. It runs the whole suite,
+checks the source fingerprint before and after, records actual JUnit results and publishes
+`docs/evidence/current.json` only on success with unchanged code. `/api/v1/judge/evidence` refuses stale fingerprints
+or schema revisions; an installed wheel without repository proof files truthfully shows not-yet-measured.
+
+The optional real Chromium workflow suite uses `python -m pytest -m browser tests/browser -q` after
+`python -m pip install -e ".[dev,browser]"` and `python -m playwright install chromium`.
+Without Playwright it should skip cleanly; ordinary database/API coverage remains runnable without a browser download.
+CI has a separate browser-behavior job. Playwright is a development-only dependency because response-shape tests do not
+exercise actual login, form submission, navigation, replay or DOM behavior.
+
 ```bash
 python -m pytest -n auto                      # everything, in parallel (about 2 minutes on a laptop)
 python -m pytest tests/db/test_entry_gate.py  # one file
@@ -70,9 +81,9 @@ When adding a rule, make the test fail first. Examples that were done while buil
 
 ## What is not tested automatically
 
-* **The browser UI's behaviour.** Every screen was walked through by hand in a browser (list in
-  [DEV_LOG.md](development/DEV_LOG.md)); `tests/api/test_web.py` checks that screens are served, the CSP is strict and no screen
-  builds markup from data. There is no headless-browser suite.
+* **Every possible browser interaction.** The real Chromium suite now covers selected login, denial receipt, incident
+  retry, event refresh and role-navigation workflows. It does not replace field usability testing, exhaustive accessibility
+  review or testing every browser/device. `tests/api/test_web.py` separately checks serving and CSP.
 * **Independent field truth.** Tests use synthetic records. They do not establish real gas values, equipment use, rescue response,
   legal certification or field detection accuracy.
 

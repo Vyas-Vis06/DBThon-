@@ -2,6 +2,7 @@
 entries (90-minute limit, overlap) -> close -> resolve; and the fatality transaction. PROJECT_SPEC section 8."""
 
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 from tests.api.conftest import API, ok, refused
 
@@ -10,6 +11,20 @@ NOW = lambda: datetime.now(timezone.utc)  # noqa: E731
 
 def iso(dt: datetime) -> str:
     return dt.isoformat()
+
+
+def readiness_details(kind: str) -> dict:
+    """Canonical synthetic references for the DB-validated educational fixture."""
+    refs = {
+        "STRUCTURE": {"inspection_ref": "TEST-STRUCTURE-INSPECTION", "qualified_person_ref": "TEST-QUALIFIED-PERSON"},
+        "ISOLATION": {"isolation_ref": "TEST-ISOLATION-LOCKOUT"},
+        "VENTILATION": {"method_ref": "TEST-VENTILATION-METHOD", "opened_at": iso(NOW() - timedelta(minutes=1))},
+        "RESCUE": {"plan_ref": "TEST-RESCUE-PLAN", "retrieval_asset_ref": "TEST-RETRIEVAL-ASSET"},
+        "COMMUNICATION": {"method_ref": "TEST-COMMUNICATION-METHOD", "test_ref": "TEST-COMMUNICATION-TEST"},
+        "TRAFFIC": {"barrier_ref": "TEST-TRAFFIC-BARRIER"},
+        "MEDICAL": {"contact_ref": "TEST-MEDICAL-CONTACT", "first_aid_ref": "TEST-FIRST-AID-KIT"},
+    }
+    return refs[kind]
 
 
 def new_job(api, world, contractor=None, *, waiver=True):
@@ -23,8 +38,9 @@ def new_job(api, world, contractor=None, *, waiver=True):
 
 
 def build_permit(api, world, *, standby=True, full_gear=True, bottom_age_min=1):
-    """A DRAFT permit through the API: crew of four (w0 is the worker login), gear, readings. Returns (complaint, job, permit)."""
+    """A valid-by-default DRAFT permit; switches leave specific adverse evidence for negative cases."""
     sup = api("supervisor")
+    engineer = api("engineer")
     complaint, job = new_job(api, world)
     permit = ok(sup.post(f"{API}/permits", json={"job_id": job["job_id"]}), 201)
     pid = permit["permit_id"]
@@ -32,10 +48,27 @@ def build_permit(api, world, *, standby=True, full_gear=True, bottom_age_min=1):
     crew = [(w[0], "ENTRANT"), (w[1], "ENTRANT"), (w[3], "SUPERVISOR")] + ([(w[2], "STANDBY")] if standby else [])
     for worker, role in crew:
         ok(sup.post(f"{API}/permits/{pid}/crew", json={"worker_id": worker, "crew_role": role}), 201)
-    statutory = [g["gear_code"] for g in ok(api("supervisor").get(f"{API}/gear-items?statutory=true"))["items"]]
+        worker_user = "worker_a" if worker == w[0] else f"worker_a_{w.index(worker)}"
+        ok(api(worker_user).post(f"{API}/permits/{pid}/acknowledge", headers={"Idempotency-Key": str(uuid4())}))
+    gear_items = ok(api("supervisor").get(f"{API}/gear-items"))["items"]
+    statutory = [g["gear_code"] for g in gear_items if g["statutory"] and g["requirement_scope"] == "ENTRANT"]
     for worker in (w[0], w[1]):
         for code in statutory[: (len(statutory) if full_gear or worker != w[1] else len(statutory) - 1)]:
-            ok(sup.post(f"{API}/permits/{pid}/gear", json={"worker_id": worker, "gear_code": code, "serial_no": f"SN-{worker}-{code}"}), 201)
+            serial = f"SN-{worker}-{code}"
+            asset = ok(engineer.post(f"{API}/reference/gear-assets", json={"ulb_id": world["ulb"], "gear_code": code,
+                "serial_no": serial, "inspection_valid_until": "2099-12-31"}, headers={"Idempotency-Key": str(uuid4())}), 201)
+            ok(sup.post(f"{API}/permits/{pid}/gear", json={"worker_id": worker, "gear_code": code,
+                "serial_no": serial, "gear_asset_id": asset["gear_asset_id"]}), 201)
+    for item in (g for g in gear_items if g["requirement_scope"] == "SITE"):
+        serial = f"SITE-{pid}-{item['gear_code']}"
+        asset = ok(engineer.post(f"{API}/reference/gear-assets", json={"ulb_id": world["ulb"], "gear_code": item["gear_code"],
+            "serial_no": serial, "inspection_valid_until": "2099-12-31"}, headers={"Idempotency-Key": str(uuid4())}), 201)
+        ok(sup.post(f"{API}/permits/{pid}/site-gear", json={"gear_asset_id": asset["gear_asset_id"]},
+                    headers={"Idempotency-Key": str(uuid4())}), 201)
+    for kind in ("STRUCTURE", "ISOLATION", "VENTILATION", "RESCUE", "COMMUNICATION", "TRAFFIC", "MEDICAL"):
+        ok(sup.post(f"{API}/permits/{pid}/readiness", json={"kind": kind, "passed": True,
+            "expires_at": (NOW() + timedelta(hours=1)).isoformat(), "details": readiness_details(kind)},
+            headers={"Idempotency-Key": str(uuid4())}), 201)
     for level, age in (("TOP", 1), ("MID", 1), ("BOTTOM", bottom_age_min)):
         ok(sup.post(f"{API}/permits/{pid}/readings", json={
             "detector_id": world["detector"], "depth_level": level, "o2_pct": 20.9, "h2s_ppm": 0, "lel_pct": 0, "co_ppm": 0,
@@ -74,11 +107,29 @@ def test_machine_fails_then_waiver_then_denied_with_reasons_then_authorised(api,
     w = world["workers_a"]
     for worker, role in ((w[0], "ENTRANT"), (w[1], "ENTRANT"), (w[3], "SUPERVISOR")):
         ok(sup.post(f"{API}/permits/{pid}/crew", json={"worker_id": worker, "crew_role": role}), 201)
-    statutory = [g["gear_code"] for g in ok(sup.get(f"{API}/gear-items?statutory=true"))["items"]]
+        ok(api("worker_a" if worker == w[0] else f"worker_a_{w.index(worker)}").post(
+            f"{API}/permits/{pid}/acknowledge", headers={"Idempotency-Key": str(uuid4())}))
+    gear_items = ok(sup.get(f"{API}/gear-items"))["items"]
+    statutory = [g["gear_code"] for g in gear_items if g["statutory"] and g["requirement_scope"] == "ENTRANT"]
     assert len(statutory) == 5
+    engineer = api("engineer")
     for worker in (w[0], w[1]):
         for code in statutory if worker == w[0] else statutory[:-1]:
-            ok(sup.post(f"{API}/permits/{pid}/gear", json={"worker_id": worker, "gear_code": code, "serial_no": f"SN-{worker}-{code}"}), 201)
+            serial = f"SN-{worker}-{code}"
+            asset = ok(engineer.post(f"{API}/reference/gear-assets", json={"ulb_id": world["ulb"], "gear_code": code,
+                "serial_no": serial, "inspection_valid_until": "2099-12-31"}, headers={"Idempotency-Key": str(uuid4())}), 201)
+            ok(sup.post(f"{API}/permits/{pid}/gear", json={"worker_id": worker, "gear_code": code,
+                "serial_no": serial, "gear_asset_id": asset["gear_asset_id"]}), 201)
+    for item in (g for g in gear_items if g["requirement_scope"] == "SITE"):
+        serial = f"SITE-{pid}-{item['gear_code']}"
+        asset = ok(engineer.post(f"{API}/reference/gear-assets", json={"ulb_id": world["ulb"], "gear_code": item["gear_code"],
+            "serial_no": serial, "inspection_valid_until": "2099-12-31"}, headers={"Idempotency-Key": str(uuid4())}), 201)
+        ok(sup.post(f"{API}/permits/{pid}/site-gear", json={"gear_asset_id": asset["gear_asset_id"]},
+                    headers={"Idempotency-Key": str(uuid4())}), 201)
+    for kind in ("STRUCTURE", "ISOLATION", "VENTILATION", "RESCUE", "COMMUNICATION", "TRAFFIC", "MEDICAL"):
+        ok(sup.post(f"{API}/permits/{pid}/readiness", json={"kind": kind, "passed": True,
+            "expires_at": (NOW() + timedelta(hours=1)).isoformat(), "details": readiness_details(kind)},
+            headers={"Idempotency-Key": str(uuid4())}), 201)
     for level, age in (("TOP", 1), ("MID", 2), ("BOTTOM", 22)):
         ok(sup.post(f"{API}/permits/{pid}/readings", json={"detector_id": world["detector"], "depth_level": level, "o2_pct": 20.9,
                                                            "h2s_ppm": 0, "lel_pct": 0, "co_ppm": 0, "taken_at": iso(NOW() - timedelta(minutes=age))}), 201)
@@ -91,11 +142,16 @@ def test_machine_fails_then_waiver_then_denied_with_reasons_then_authorised(api,
     assert sorted(denied["failed"]) == ["CREW_STANDBY", "GAS_BOTTOM", "GEAR_ALL"]
     by_code = {c["clause_code"]: c for c in denied["clauses"]}
     assert "22 min old" in by_code["GAS_BOTTOM"]["detail"] and "standby" in by_code["CREW_STANDBY"]["detail"]
-    assert all(c["title"] and c["legal_ref"] for c in denied["clauses"]) and len(denied["clauses"]) == 11
+    assert all(c["title"] and c["legal_ref"] for c in denied["clauses"]) and len(denied["clauses"]) == 18
 
     # 4. the supervisor fixes each point and is AUTHORISED
     ok(sup.post(f"{API}/permits/{pid}/crew", json={"worker_id": w[2], "crew_role": "STANDBY"}), 201)
-    ok(sup.post(f"{API}/permits/{pid}/gear", json={"worker_id": w[1], "gear_code": statutory[-1], "serial_no": "SN-LATE"}), 201)
+    ok(api("worker_a_2").post(f"{API}/permits/{pid}/acknowledge", headers={"Idempotency-Key": str(uuid4())}))
+    serial = "SN-LATE"
+    asset = ok(engineer.post(f"{API}/reference/gear-assets", json={"ulb_id": world["ulb"], "gear_code": statutory[-1],
+        "serial_no": serial, "inspection_valid_until": "2099-12-31"}, headers={"Idempotency-Key": str(uuid4())}), 201)
+    ok(sup.post(f"{API}/permits/{pid}/gear", json={"worker_id": w[1], "gear_code": statutory[-1],
+        "serial_no": serial, "gear_asset_id": asset["gear_asset_id"]}), 201)
     ok(sup.post(f"{API}/permits/{pid}/readings", json={"detector_id": world["detector"], "depth_level": "BOTTOM", "o2_pct": 20.8,
                                                        "h2s_ppm": 1, "lel_pct": 0, "co_ppm": 2}), 201)
     granted = ok(sup.post(f"{API}/permits/{pid}/authorise"))
@@ -117,19 +173,23 @@ def test_entries_use_current_admission_and_exits_remain_recordable(api, world, c
     widen_daylight(api)
     complaint, job, permit = build_permit(api, world)
     pid, w = permit["permit_id"], world["workers_a"]
-    assert ok(sup.post(f"{API}/permits/{pid}/authorise"))["authorised"] is True
+    decision = ok(sup.post(f"{API}/permits/{pid}/authorise"))
+    assert decision["authorised"] is True and decision["current_decision_usable"] is True
+    receipt_id = decision["receipt_id"]
     start = NOW()
 
     # A client cannot backdate a new open admission to make an old authorized permit look current.
     refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start - timedelta(hours=1))}),
             422, "rule_violation", "server clock")
     refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[2], "entered_at": iso(start)}), 422, "rule_violation", "ENTRANT")
-    entry = ok(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start)}), 201)
-    assert entry["open"] is True
+    entry = ok(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start),
+                                                               "receipt_id": receipt_id}), 201)
+    assert entry["open"] is True and entry["receipt_id"] == receipt_id
     refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[0], "entered_at": iso(start + timedelta(minutes=1)),
                                                            "exited_at": iso(start + timedelta(minutes=30))}), 409, "overlap")
     other = ok(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[1], "entered_at": iso(start),
-                                                            "exited_at": iso(NOW() + timedelta(minutes=2))}), 201)
+                                                                "receipt_id": receipt_id,
+                                                                "exited_at": iso(NOW() + timedelta(minutes=2))}), 201)
     assert other["minutes"] >= 1 and other["exit_recorded_at"] is not None
     assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE entry_id = %s AND reason_code = 'EXIT_TIME_AHEAD_OF_RECEIPT'",
                         (other["entry_id"],)).fetchone()["n"] == 1
@@ -140,11 +200,36 @@ def test_entries_use_current_admission_and_exits_remain_recordable(api, world, c
     done = ok(sup.post(f"{API}/permits/{pid}/entries/{entry['entry_id']}/exit", json={"exited_at": iso(NOW() + timedelta(minutes=2))}))
     assert done["minutes"] >= 1 and done["open"] is False and done["exit_recorded_at"] is not None
     assert ok(sup.post(f"{API}/permits/{pid}/close"))["status"] == "CLOSED"
-    refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[1], "entered_at": iso(start + timedelta(minutes=90))}), 409, "invalid_state")
+    refused(sup.post(f"{API}/permits/{pid}/entries", json={"worker_id": w[1], "entered_at": iso(start + timedelta(minutes=90))}), 409, "receipt_stale")
 
     # the closed, logged permit is lawful clearance evidence: resolving the complaint raises no warning
     resolved = ok(eng.post(f"{API}/complaints/{complaint['complaint_id']}/resolve", json={"resolution_code": "CLEARED"}))
     assert resolved["status"] == "RESOLVED" and resolved["evidence_on_file"] is True and resolved["warning"] is None
+
+
+def test_authorization_denial_receipt_replays_exactly_until_a_new_key_rechecks(api, world):
+    sup, engineer = api("supervisor"), api("engineer")
+    _, _, permit = build_permit(api, world, full_gear=False)
+    pid = permit["permit_id"]
+    key = str(uuid4())
+    first = ok(sup.post(f"{API}/permits/{pid}/authorise", headers={"Idempotency-Key": key}))
+    assert first["authorised"] is False and first["receipt"]["decision"] == "DENIED"
+    assert ok(sup.post(f"{API}/permits/{pid}/authorise", headers={"Idempotency-Key": key})) == first
+
+    missing_code = [g["gear_code"] for g in ok(sup.get(f"{API}/gear-items"))["items"]
+                    if g["statutory"] and g["requirement_scope"] == "ENTRANT"][-1]
+    serial = f"FIX-{pid}-{missing_code}"
+    asset = ok(engineer.post(f"{API}/reference/gear-assets", json={"ulb_id": world["ulb"], "gear_code": missing_code,
+        "serial_no": serial, "inspection_valid_until": "2099-12-31"}, headers={"Idempotency-Key": str(uuid4())}), 201)
+    ok(sup.post(f"{API}/permits/{pid}/gear", json={"worker_id": world["workers_a"][1], "gear_code": missing_code,
+        "serial_no": serial, "gear_asset_id": asset["gear_asset_id"]}), 201)
+
+    # Replaying the original command returns the committed denial, even though evidence has since changed.
+    assert ok(sup.post(f"{API}/permits/{pid}/authorise", headers={"Idempotency-Key": key})) == first
+    second = ok(sup.post(f"{API}/permits/{pid}/authorise", headers={"Idempotency-Key": str(uuid4())}))
+    assert second["authorised"] is True and second["receipt"]["decision"] == "AUTHORISED"
+    dossier = ok(sup.get(f"{API}/permits/{pid}"))
+    assert dossier["current_decision_usable"] is True and dossier["current_receipt"]["receipt_id"] == second["receipt_id"]
 
 
 def test_exit_can_be_logged_after_permit_abort_without_rewriting_the_stop_reason(api, world, conn):

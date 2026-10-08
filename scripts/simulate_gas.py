@@ -12,6 +12,7 @@ import argparse
 import getpass
 import os
 import time
+from uuid import uuid4
 from urllib.parse import urlparse
 
 import httpx
@@ -28,20 +29,25 @@ def main():
     args = parser.parse_args()
     if urlparse(args.url).hostname not in ("127.0.0.1", "localhost", "::1"):
         parser.error("This synthetic demo only targets a local server.")
-    if args.unsafe_after < 2 or args.interval < 0:
-        parser.error("unsafe-after >=2 and interval >=0 required")
+    if not 2 <= args.unsafe_after <= 50 or not 0 <= args.interval <= 60:
+        parser.error("unsafe-after must be 2..50 cycles and interval must be 0..60 seconds")
     password = os.getenv("ZEROENTRY_DEMO_PASSWORD") or getpass.getpass("Local demo password: ")
     with httpx.Client(base_url=args.url.rstrip("/") + "/api/v1", timeout=15) as client:
         login = client.post("/auth/login", json={"email": args.email, "password": password})
         login.raise_for_status()
-        client.headers["X-CSRF-Token"] = login.json()["csrf_token"]
+        client.headers["Authorization"] = f"Bearer {login.json()['session_token']}"
+        dossier = client.get(f"/permits/{args.permit}")
+        dossier.raise_for_status()
+        if not dossier.json().get("policy", {}).get("educational"):
+            raise SystemExit("Synthetic readings are restricted to an explicitly EDUCATIONAL ULB policy.")
         for cycle in range(1, args.unsafe_after + 1):
             for depth in ("TOP", "MID", "BOTTOM"):
                 unsafe = cycle == args.unsafe_after and depth == "BOTTOM"
                 start = time.perf_counter()
                 response = client.post(f"/permits/{args.permit}/readings", json={
                     "detector_id": args.detector, "depth_level": depth, "o2_pct": 12 if unsafe else 20.9,
-                    "h2s_ppm": 0, "lel_pct": 0, "co_ppm": 0})
+                    "h2s_ppm": 0, "lel_pct": 0, "co_ppm": 0, "source_mode": "SIMULATED"},
+                    headers={"Idempotency-Key": str(uuid4())})
                 response.raise_for_status()
                 elapsed = (time.perf_counter() - start) * 1000
                 print(f"Synthetic cycle {cycle}, {depth}, reading #{response.json()['reading_id']}: {elapsed:.1f} ms HTTP round trip")

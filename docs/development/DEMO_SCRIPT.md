@@ -1,84 +1,90 @@
-# Demo script (about 3 minutes)
+# ZE2 demonstration and rehearsal
 
-Use a fresh, isolated synthetic demo directory without resetting an existing database:
+## Prepare before presenting
 
-```bash
-python scripts/dev.py --data-dir .pgdata/presentation-final --port 8000
+Use the repository virtual environment and a dedicated synthetic directory. Do not reset a teammate's database.
+
+```powershell
+python scripts/dev.py --data-dir .pgdata/dbthon-ze2 --port 8000
 ```
 
-Keep the generated password at hand. For a presentation outside 06:00–18:00 IST, an ADMIN can widen the product daylight
-proxy for this synthetic rehearsal only, supplying a reason such as “Synthetic evening presentation, no field operation”.
-Show this change in policy history, and explain that astronomical daylight and real instruments remain outside the demo.
+Keep the generated local password privately. In a second terminal, while that server runs:
 
-## 0:00 · The problem (20 s)
-
-> "Indian law and operational guidance require safeguards for sewer entry. ZeroEntry links a recorded permit decision to municipal completion evidence. Its configured safeguards show their legal, guidance or product-policy basis, and missing records become reviewable gaps."
-
-## 0:20 · Default deny (70 s), as `supervisor@`
-
-1. **Permits** → open the **DRAFT** permit on manhole **CHN-ADY-010**. The checklist shows **5 of 11 clauses failing**: no
-   standby; entrant NAM-TN-100002 lacks the breathing apparatus and harness; no TOP, MID or BOTTOM gas reading.
-   > "This is relational division: every entrant must hold every configured required item, and every depth needs a fresh, in-limit
-   > reading from a calibrated detector."
-2. Press **Ask the database to authorise entry** → **denied**, with the five reasons. Nothing was authorised.
-3. Fix it through the tabs: **Crew** → add a STANDBY (e.g. NAM-TN-100003); **Gear** → issue the two missing items to
-   NAM-TN-100002; **Gas readings** → log TOP, MID and BOTTOM with detector **GD-4G-0001**.
-   *Optional:* try detector **GD-4G-0002** first: refused, "calibration expired".
-4. Press **Ask the database to authorise entry** again → **AUTHORISED**, valid for 4 hours.
-5. Open **Original authorisation**: show the saved policy revisions, classified sources, evidence IDs and digest.
-   Log an open entry. Attempt an overlapping entry for the same worker, or close the permit while they are inside: refused.
-   Add a BOTTOM reading with O₂ 12%: the database aborts the permit and appends durable safety events. **Record exit** still
-   works after the stop. Alternatively run the authenticated synthetic feed (complete crew/gear first):
-
-   ```bash
-   python scripts/simulate_gas.py --permit 2 --detector 1 --unsafe-after 2
-   ```
-
-   Enter the printed demo password at the hidden prompt. This script posts simulated values as a signed-in supervisor,
-   not as an independently authenticated instrument. The original authorization artifact remains unchanged after stop.
-
-## 1:30 · Detection by absence (50 s), as `engineer@`
-
-6. **Shadow entries** → five alerts. Point at one with **no job at all** (CHN-ADY-004):
-   > "A complaint closed as cleared, with no machine log and no closed permit with a logged entry. The anti-join finds the
-   > records a lawful clearance would have left, and they are not there."
-7. Open the alert on **CHN-ADY-006** (status **EVIDENCE_RECEIVED**): its machine log was recorded days late.
-   > "Late paperwork never closes an alert by itself; a person decides."
-   **Dismiss** it with a note → its invoice hold is released, and only that hold.
-8. Press **Run the absence scan now** → nothing new, nothing re-opened (idempotent).
-
-## 2:20 · Consequences (30 s)
-
-9. **Incidents** → the seeded fatality: a ₹30-lakh compensation case with a due date, the contractor blacklisted, in one
-   procedure call. In a terminal:
-
-   ```bash
-   python scripts/run_sql.py database/queries/06_transactions.sql
-   ```
-
-   > "If any step of that procedure fails, nothing is left behind: here is the rollback."
-
-## 2:50 · Close (10 s)
-
-10. **Admin → Policy and sources** (as `admin@`): show a parameter revision and its source classification; the change you made
-    is in its revision history and the **Audit log**.
-    > "The database owns the configured gate. Policy history explains the decision, and missing evidence remains reviewable."
-
-## If asked "how do you know it is better?" (30 s)
-
-Open [EVALUATION_RESULTS.md](../EVALUATION_RESULTS.md) (summary in [EVALUATION.md](../EVALUATION.md#results)): detection
-precision and recall against the naive anti-join, 18 of 18 invalid writes refused against 1 of 18 when the rules live in
-application code, and latency at 100,000 complaints. To show it is real, run a small version live (under a minute; it starts its own throwaway server, so `dev.py` can keep
-running, just as the test suite runs several embedded servers at once):
-
-```bash
-python scripts/evaluate.py --sizes 1000 --per-class 5 --out -
+```powershell
+python scripts/prepare_demo.py
 ```
 
-## Backup: the same story in SQL only
+Enter the same password at the hidden prompt. The helper uses the normal authenticated API as the educational engineer,
+supervisor and four worker accounts. It creates one new DRAFT, synthetic inspected serial assets, seven attributed typed
+readiness records and three explicitly SIMULATED gas observations. It leaves the fourth worker's acknowledgement missing.
+It never changes real policy, uses owner SQL or automatically authorizes a permit. Its JSON gives the IDs to use below.
+Each invocation creates a separate rehearsal, not an idempotent reset. No real inspection or field measurement occurred.
 
-```bash
-python scripts/run_sql.py database/queries/07_trigger_refusals.sql      # nine rules refusing nine bad writes
-python scripts/run_sql.py database/queries/04_division_and_anti_join.sql
-python scripts/run_sql.py database/queries/05_views_functions_procedures.sql
+Gas expires under the configured freshness rule; prepare shortly before the demonstration and refresh all three samples
+if necessary. Readiness expires after one hour. Outside the configured daylight hours, an ADMIN may widen only the
+product daylight proxy for this synthetic rehearsal with an explicit audit reason. Never change a real scope from
+REVIEW_REQUIRED/DENIED to EDUCATIONAL to obtain a green decision. All positive decisions are software simulations.
+
+Open separate browser profiles/private windows for `supervisor@zeroentry.example` (real-scope denial),
+`edu_supervisor@zeroentry.example` (educational workflow), `edu_worker_4@zeroentry.example` (own acknowledgement),
+and `engineer@zeroentry.example` (real-scope evidence review). They use the local generated seed password.
+
+## Four-to-five-minute judge story
+
+1. **Problem and domain (20 seconds).** Sanitation safety and municipal work-evidence accountability. Explain that
+   missing records are a reason to review, not proof that someone entered or committed misconduct.
+2. **Database design (30 seconds).** Show the ER diagram, composite crew key, personal versus shared serial inventory,
+   normalized incident/victim/assessment rows and the source-linked holds. Table count is not the novelty claim.
+3. **Real scope fails closed (25 seconds).** As the ordinary supervisor, open the seeded DRAFT on CHN-ADY-010 and ask
+   for authorization. Explain the policy eligibility denial; a waiver and more PPE cannot override it. Show the retained
+   negative receipt and classified legal/guidance/product sources. Do not quote an old fixed clause count.
+4. **Actual participation (50 seconds).** As the educational supervisor, open the helper's permit ID. Ask for
+   authorization: the unacknowledged fourth assignment denies it. In the worker's window open the same permit and
+   acknowledge only their own participation. Return to the supervisor, refresh, and request authorization again.
+   If another clause fails, show its real reason rather than hiding it. Inspect the positive receipt's revision and
+   earliest expiry alongside the original authorization snapshot.
+5. **Continuing safety and truthful exit (40 seconds).** Record a simulated open entry for an entrant. Submit a new
+   BOTTOM gas reading with H2S 1000 and all other channels supplied, clearly marked SIMULATED. Show retained adverse
+   evidence, ABORTED permission and the still-open person record. Record the actual simulated exit; stop does not erase
+   occupancy or block an honest exit. Recovery uses a new permit, never reopening ABORTED.
+6. **Completion evidence (40 seconds).** In Completion review, import a synthetic external claim using a stable external
+   ID, status COMPLETED and a past/current time. It stays UNMATCHED until explicit reviewer linkage. Show a seeded
+   complaint with no job and the separate Shadow entries screen. Explain grace, late-evidence human review and why
+   current gas aging does not invalidate a properly documented historical completion.
+7. **Unregistered victims (30 seconds).** In Incident reports record two aliases, no registered worker/job/permit, one
+   FATAL and one INJURY. Show two pending internal assessments and zero paid. The browser test proves a dropped-response
+   retry creates only one report; do not describe a second click after a successful response as that same-key retry.
+8. **Proof and novelty (25 seconds).** Show Judge evidence and the current release report. Explain the bounded
+   composition of actual participation, fresh evidence, shared resources, revision-bound admission, closure review and
+   atomic unregistered intake. Electronic permits, triggers, gas checks and worker registries are not individually new.
+
+## SQL and concurrency backup demonstrations
+
+These commands target the same isolated directory as the server above:
+
+```powershell
+python scripts/run_sql.py database/queries/04_division_and_anti_join.sql --data-dir .pgdata/dbthon-ze2
+python scripts/run_sql.py database/queries/06_transactions.sql --data-dir .pgdata/dbthon-ze2
+python scripts/run_sql.py database/queries/08_cursor_and_assertion_lab.sql --data-dir .pgdata/dbthon-ze2
 ```
+
+The first shows division/absence, the second real procedure rollback, and the third explicit OPEN/FETCH/CLOSE plus a
+controlled cross-row constraint-trigger/exception exercise. PostgreSQL 16 has no CREATE ASSERTION; PL/pgSQL is its
+runtime language, not Oracle PL/SQL. The original query assertions use the fresh seeded world; a demonstration that
+adds new records naturally changes its counts. Do not treat those post-rehearsal counts as a regression failure.
+
+For a local synthetic feed, after all acknowledgement/readiness requirements are satisfied:
+
+```powershell
+python scripts/simulate_gas.py --email edu_supervisor@zeroentry.example --permit PERMIT_ID --detector DETECTOR_ID --unsafe-after 2
+```
+
+Replace IDs with the helper's output. The feed uses software observations and stops on a real API denial; it is not
+authenticated physical instrumentation. Shared-person/asset concurrency, receipt aging, raw-write refusal and financial
+serialization are reproducible regression tests; show their named test evidence when a live race would take too long.
+
+## Honest closing statement
+
+This is a laboratory prototype, self-assessed TRL4. Synthetic tests prove stored-state behavior under stated assumptions,
+not legal applicability, real gas truth, physical prevention, field detection accuracy, paid compensation or lives saved.
+Use the current source-matching report; historical benchmark timings do not automatically apply to a new revision.

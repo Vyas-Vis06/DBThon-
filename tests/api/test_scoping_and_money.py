@@ -43,11 +43,8 @@ def test_permits_are_visible_to_their_contractor_and_crew_only(api, world):
 
 def test_a_worker_who_is_not_on_the_crew_sees_no_permit(app, api, world, conn):
     """A second worker login (same contractor, different person) is not crewed on the permit: it does not exist for them."""
-    from tests.api.conftest import PASSWORD, login
-    from zeroentry.security import hash_password
-    world["f"].user("WORKER", email="spare@zeroentry.example", password_hash=hash_password(PASSWORD, rounds=4), worker_id=world["workers_a"][4])
     _, _, permit = build_permit(api, world)                          # crew is workers_a[0..3]
-    spare = login(app, "spare@zeroentry.example")
+    spare = api("worker_a_4")
     assert ok(spare.get(f"{API}/permits"))["total"] == 0
     refused(spare.get(f"{API}/permits/{permit['permit_id']}"), 404)
     refused(spare.post(f"{API}/permits/{permit['permit_id']}/stop-work", json={"reason": "I am not on this crew"}), 404)

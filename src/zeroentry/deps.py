@@ -94,7 +94,8 @@ def authenticate(request: Request, db: DB) -> Principal:
         func.set_config("app.user_id", str(user.user_id), True),
         func.set_config("app.role", role_name, True),
         func.set_config("app.contractor_id", str(user.contractor_id or ""), True),
-        func.set_config("app.worker_id", str(user.worker_id or ""), True)))
+        func.set_config("app.worker_id", str(user.worker_id or ""), True),
+        func.set_config("app.ulb_id", str(user.ulb_id or ""), True)))
     return Principal(user.user_id, role_name, user.email, user.full_name, user.ulb_id, user.contractor_id,
                      user.worker_id, session_row.session_id, session_row.csrf_token, via_cookie)
 

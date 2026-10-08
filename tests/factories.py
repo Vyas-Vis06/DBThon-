@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 _seq = itertools.count(1)
 
@@ -46,7 +47,15 @@ class Factory:
     # -- people and organisations --------------------------------------------------------------------
     def ulb(self, **kw: Any) -> int:
         n = next(_seq)
-        return self.insert("ulb", "ulb_id", **{"name": f"Test ULB {n}", "district": "Chennai", "state": "Tamil Nadu", **kw})
+        # Test factories create an explicitly educational scope. Production/new scopes use the migration's
+        # REVIEW_REQUIRED default; this convenience never changes real seeded municipalities.
+        values = {"name": f"EDU test ULB {n}", "district": "Chennai", "state": "Tamil Nadu", **kw}
+        # Migration-backfill tests deliberately construct databases at pre-0015 revisions.
+        has_policy_mode = self.scalar("SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+                                      "WHERE table_schema=current_schema() AND table_name='ulb' AND column_name='policy_mode')")
+        if has_policy_mode:
+            values.setdefault("policy_mode", "EDUCATIONAL")
+        return self.insert("ulb", "ulb_id", **values)
 
     def contractor(self, **kw: Any) -> int:
         n = next(_seq)
@@ -129,33 +138,83 @@ class Factory:
     def permit(self, job_id: int, supervisor_id: int) -> int:
         return self.insert("entry_permit", "permit_id", job_id=job_id, supervisor_id=supervisor_id)
 
-    def crew(self, permit_id: int, worker_id: int, role: str) -> None:
+    def crew(self, permit_id: int, worker_id: int, role: str, *, acknowledged: bool = True,
+             acknowledged_at: datetime | None = None) -> int | None:
         self.c.execute("INSERT INTO permit_crew (permit_id, worker_id, crew_role) VALUES (%s, %s, %s)",
                        (permit_id, worker_id, role))
+        if not acknowledged:
+            return None
+        actor = self.c.execute("SELECT user_id FROM app_user WHERE worker_id = %s", (worker_id,)).fetchone()
+        user_id = actor["user_id"] if actor else self.user("WORKER", worker_id=worker_id)
+        self.c.execute("UPDATE permit_crew SET acknowledged_by=%s, acknowledged_at=%s WHERE permit_id=%s AND worker_id=%s",
+                       (user_id, acknowledged_at or datetime.now(timezone.utc), permit_id, worker_id))
+        return user_id
 
     def issue_gear(self, permit_id: int, worker_id: int, issued_by: int | None = None) -> None:
         """Issue every statutory item to the worker (each with a serial number)."""
-        self.c.execute("INSERT INTO gear_issue (permit_id, worker_id, gear_code, serial_no, issued_by) "
-                       "SELECT %s, %s, gear_code, 'SN-' || gear_code, %s FROM gear_item WHERE statutory",
-                       (permit_id, worker_id, issued_by))
+        items = self.c.execute("SELECT gear_code FROM gear_item WHERE statutory AND requirement_scope='ENTRANT' ORDER BY gear_code").fetchall()
+        for item in items:
+            self.issue_gear_item(permit_id, worker_id, item["gear_code"], issued_by)
+
+    def issue_gear_item(self, permit_id: int, worker_id: int, gear_code: str, issued_by: int | None = None) -> int:
+        """Create an explicitly inspected synthetic serial asset and issue it in this test fixture."""
+        ulb_id = self.scalar("SELECT m.ulb_id FROM entry_permit p JOIN job j USING (job_id) "
+                             "JOIN complaint c USING (complaint_id) JOIN manhole m USING (manhole_id) WHERE p.permit_id=%s", permit_id)
+        n = next(_seq)
+        asset = self.insert("gear_asset", "gear_asset_id", ulb_id=ulb_id, gear_code=gear_code,
+                            serial_no=f"EDU-SN-{n:06d}", status="USABLE", inspection_valid_until="2099-12-31")
+        self.insert("gear_issue", "issue_id", permit_id=permit_id, worker_id=worker_id, gear_code=gear_code,
+                    serial_no=f"EDU-SN-{n:06d}", gear_asset_id=asset, issued_by=issued_by)
+        return asset
+
+    def site_gear(self, permit_id: int, gear_code: str = "FIRST_AID_KIT", issued_by: int | None = None) -> int:
+        ulb_id = self.scalar("SELECT m.ulb_id FROM entry_permit p JOIN job j USING (job_id) "
+                             "JOIN complaint c USING (complaint_id) JOIN manhole m USING (manhole_id) WHERE p.permit_id=%s", permit_id)
+        n = next(_seq)
+        asset = self.insert("gear_asset", "gear_asset_id", ulb_id=ulb_id, gear_code=gear_code,
+                            serial_no=f"EDU-SITE-{n:06d}", status="USABLE", inspection_valid_until="2099-12-31")
+        self.insert("permit_site_gear", "site_gear_id", permit_id=permit_id, gear_asset_id=asset, issued_by=issued_by)
+        return asset
+
+    def readiness(self, permit_id: int, recorded_by: int, at: datetime | None = None, *, failed: str | None = None) -> None:
+        ref = "EDU-FIXTURE-REFERENCE"
+        details_by_kind = {
+            "STRUCTURE": {"inspection_ref": ref, "qualified_person_ref": ref},
+            "ISOLATION": {"isolation_ref": ref},
+            "VENTILATION": {"opened_at": (at or datetime.now(timezone.utc)).isoformat(), "method_ref": ref},
+            "RESCUE": {"plan_ref": ref, "retrieval_asset_ref": ref},
+            "COMMUNICATION": {"method_ref": ref, "test_ref": ref},
+            "TRAFFIC": {"barrier_ref": ref},
+            "MEDICAL": {"contact_ref": ref, "first_aid_ref": ref},
+        }
+        for kind in ("STRUCTURE", "ISOLATION", "VENTILATION", "RESCUE", "COMMUNICATION", "TRAFFIC", "MEDICAL"):
+            recorded = at or datetime.now(timezone.utc)
+            self.insert("permit_readiness", "readiness_id", permit_id=permit_id, kind=kind,
+                        passed=(kind != failed), recorded_by=recorded_by, recorded_at=recorded,
+                        expires_at=recorded + timedelta(days=2), details=Jsonb({**details_by_kind[kind],
+                        "fixture": "explicit synthetic educational test attestation; references are illustrative, not physical verification"}),
+                        source_mode="SIMULATED")
 
     def reading(self, permit_id: int, detector_id: int, level: str, taken_at: datetime, recorded_by: int,
                 *, o2: float = 20.9, h2s: float = 0, lel: float = 0, co: float = 0) -> int:
         return self.insert("gas_reading", "reading_id", permit_id=permit_id, detector_id=detector_id, depth_level=level,
                            o2_pct=o2, h2s_ppm=h2s, lel_pct=lel, co_ppm=co, taken_at=taken_at, recorded_by=recorded_by)
 
-    def gate_scenario(self, at: datetime, *, readings: dict[str, dict | None] | None = None) -> dict[str, Any]:
+    def gate_scenario(self, at: datetime, *, readings: dict[str, dict | None] | None = None,
+                      include_new_evidence: bool = True) -> dict[str, Any]:
         """A DRAFT permit that satisfies every legal clause as of `at`, plus all the ids a test may want to break.
 
         `readings` overrides per depth level: None skips the level; a dict may carry age_min, o2, h2s, lel, co.
         Default is a fresh, in-limit reading at TOP, MID and BOTTOM five minutes before `at`.
         """
         s: dict[str, Any] = {"at": at}
-        s["ulb"] = self.ulb()
+        s["ulb"] = self.ulb(policy_mode="EDUCATIONAL")
         s["contractor"] = self.contractor()
         s["manhole"] = self.manhole(s["ulb"])
-        s["engineer"] = self.user("ENGINEER")
-        s["supervisor"] = self.user("SUPERVISOR")
+        s["engineer"] = self.user("ENGINEER", ulb_id=s["ulb"])
+        s["supervisor"] = self.user("SUPERVISOR", ulb_id=s["ulb"])
+        self.insert("ulb_contractor_scope", "contractor_id", ulb_id=s["ulb"], contractor_id=s["contractor"],
+                    assigned_by=s["engineer"], assignment_reason="Explicit synthetic test-scope contractor assignment")
         s["complaint"] = self.complaint(s["manhole"])
         s["job"] = self.job(s["complaint"], s["contractor"])
         s["machine"] = self.machine(s["ulb"])
@@ -164,10 +223,15 @@ class Factory:
         s["permit"] = self.permit(s["job"], s["supervisor"])
         for name, role in (("e1", "ENTRANT"), ("e2", "ENTRANT"), ("standby", "STANDBY"), ("sup_worker", "SUPERVISOR")):
             s[name] = self.worker(s["contractor"])
-            self.crew(s["permit"], s[name], role)
+            s[f"worker_user_{name}"] = self.crew(s["permit"], s[name], role, acknowledged_at=at - timedelta(minutes=2))
         for name in ("e1", "e2"):
             self.issue_gear(s["permit"], s[name], s["supervisor"])
+        if include_new_evidence:
+            s["site_asset"] = self.site_gear(s["permit"], issued_by=s["supervisor"])
+            self.readiness(s["permit"], s["supervisor"], at - timedelta(minutes=2))
         s["detector"] = self.detector()
+        self.insert("ulb_detector_scope", "detector_id", ulb_id=s["ulb"], detector_id=s["detector"],
+                    assigned_by=s["engineer"], assignment_reason="Explicit synthetic test-scope detector assignment")
         spec = {"TOP": {}, "MID": {}, "BOTTOM": {}}
         spec.update(readings or {})
         for level, opts in spec.items():

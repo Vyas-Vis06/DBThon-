@@ -7,6 +7,7 @@ import pytest
 from psycopg.rows import tuple_row
 
 from zeroentry.seed import run_seed
+from tests.factories import Factory, yesterday_ist
 
 QUERIES = sorted((Path(__file__).resolve().parents[2] / "database" / "queries").glob("*.sql"))
 
@@ -38,7 +39,7 @@ def q(demo, name):
 
 
 def test_there_is_a_documented_query_file_for_each_topic():
-    assert [p.name[:2] for p in QUERIES] == ["01", "02", "03", "04", "05", "06", "07"]
+    assert [p.name[:2] for p in QUERIES] == ["01", "02", "03", "04", "05", "06", "07", "08"]
 
 
 @pytest.mark.parametrize("path", QUERIES, ids=lambda p: p.name)
@@ -74,7 +75,7 @@ def test_search_queries_use_the_documented_filters(demo):
     workers_by_id, workers_by_name, permits, complaints, alerts, lapsing, trail = (rows for _, rows in results)
     assert len(workers_by_id) == 10 and all(r[2].startswith("NAM-TN-1000") for r in workers_by_id)
     assert all(r[1].lower().startswith("a") for r in workers_by_name) and workers_by_name
-    assert len(permits) == 2 and len(alerts) == 5 and len(lapsing) >= 3 and trail          # all five alerts are in the Adyar zone
+    assert len(permits) == 1 and len(alerts) == 5 and len(lapsing) >= 3 and trail          # the synthetic EDU permit is outside city ULB filters
 
 
 def test_division_and_anti_join_queries_find_exactly_what_the_story_promises(demo):
@@ -84,7 +85,7 @@ def test_division_and_anti_join_queries_find_exactly_what_the_story_promises(dem
     assert [r[1] for r in depth_division] == ["BOTTOM", "MID", "TOP"]                  # no readings logged at any depth
     assert len(anti_join) == 5 and [r[0] for r in anti_join] == [r[0] for r in set_algebra]   # two formulations, one answer
     assert se2 == []
-    assert len(clauses) == 11 and sum(1 for r in clauses if not r[2]) == 5
+    assert len(clauses) == 18 and sum(1 for r in clauses if not r[2]) == 11
     assert len(readiness) == 1 and readiness[0][5] is False
     assert len(suspected) == 6                                                         # 5 alerts + 1 pending inside the grace window
 
@@ -118,3 +119,15 @@ def test_every_trigger_refusal_is_demonstrated_and_nothing_changes(demo):
     assert before == counts()
     assert len(notices) == 9 and all("refused" in n for n in notices), notices
     assert "Entry denied" in notices[0] and "calibration expired" in notices[1]
+
+
+def test_cursor_rowtype_loop_and_assertion_trigger_lab_runs_without_persistent_changes(conn):
+    Factory(conn).gate_scenario(yesterday_ist())
+    before = conn.execute("SELECT count(*) AS n FROM entry_permit").fetchone()["n"]
+    results, notices = q(conn, "08")
+    assert sum("cursor visited" in n for n in notices) == before
+    assert any(f"cursor loop completed with {before} permit rows" in n for n in notices)
+    assert sum("assertion-style trigger refused" in n for n in notices) == 2
+    assert results[0][1] == [("REFUSED_ACTIVATION", False, 0)]
+    assert results[-1][1] == [("VALID_STATE_RETAINED", True, 1)]
+    assert conn.execute("SELECT count(*) AS n FROM entry_permit").fetchone()["n"] == before

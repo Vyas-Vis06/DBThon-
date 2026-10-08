@@ -16,6 +16,15 @@ a { color: var(--brand); } a:hover { text-decoration: none; }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.policy-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 10px 20px; border-bottom: 1px solid var(--line); font-size: .92rem; }
+.policy-banner strong { font-size: .95rem; letter-spacing: .02em; }
+.policy-banner.denied { color: var(--bad); background: var(--bad-bg); }
+.policy-banner.review, .policy-banner.unknown { color: var(--warn); background: var(--warn-bg); }
+.policy-banner.education { color: var(--brand); background: var(--info-bg); }
+.policy-source { font-size: .82rem; color: var(--muted); }
+.connection { margin-left: auto; font-size: .82rem; color: var(--muted); }
+.connection.bad { color: var(--bad); font-weight: 700; }
+.connection.ok { color: var(--ok); }
 .brand { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
 .brand small { font-weight: 400; color: var(--muted); }
 .mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-weight: 800; }
@@ -52,6 +61,7 @@ th { background: var(--info-bg); font-weight: 600; white-space: nowrap; } tr:las
 .badge.ok { color: var(--ok); background: var(--ok-bg); } .badge.bad { color: var(--bad); background: var(--bad-bg); }
 .badge.warn { color: var(--warn); background: var(--warn-bg); } .badge.info { color: var(--brand); background: var(--info-bg); } .badge.grey { color: var(--muted); }
 .banner { padding: 10px 14px; border-radius: var(--radius); margin: 10px 0; font-weight: 600; border: 1px solid currentColor; }
+.banner.neutral { color: var(--brand); background: var(--info-bg); }
 .banner.ok { color: var(--ok); background: var(--ok-bg); } .banner.bad { color: var(--bad); background: var(--bad-bg); } .banner.warn { color: var(--warn); background: var(--warn-bg); }
 
 .clauses { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }

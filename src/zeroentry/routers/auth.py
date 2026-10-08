@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, text, update
 
 from ..deps import DB, SESSION_COOKIE, Principal, authenticate
 from ..errors import AppError, Unauthorized, Unprocessable
@@ -18,9 +18,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 _REFUSED = "Invalid email or password, or the account is temporarily locked."
 
 
-def _user_view(user: AppUser, role: str) -> dict:
+def _user_view(user: AppUser, role: str, db=None) -> dict:
+    policy_mode = (db.scalar(text("SELECT policy_mode FROM ulb WHERE ulb_id=:ulb"), {"ulb": user.ulb_id})
+                   if db is not None and user.ulb_id is not None else None)
     return {"user_id": user.user_id, "email": user.email, "full_name": user.full_name, "role": role,
-            "ulb_id": user.ulb_id, "contractor_id": user.contractor_id, "worker_id": user.worker_id}
+            "ulb_id": user.ulb_id, "policy_mode": policy_mode,
+            "educational": policy_mode == "EDUCATIONAL" if policy_mode is not None else None,
+            "policy_provenance": "ULB policy setting stored in the application database; not an external legal citation." if policy_mode is not None else None,
+            "contractor_id": user.contractor_id, "worker_id": user.worker_id}
 
 
 @router.post("/login")
@@ -52,10 +57,18 @@ def login(body: LoginIn, request: Request, response: Response, db: DB):
     db.add(UserSession(user_id=user.user_id, token_hash=hash_token(token), csrf_token=csrf, expires_at=expires))
     db.execute(delete(UserSession).where(UserSession.expires_at < now - timedelta(days=1)))   # housekeeping
     role = db.scalar(select(Role.name).where(Role.role_id == user.role_id))
+    # LOGIN has no session dependency yet; set a transaction-local context from the verified stored user
+    # so the ULB's RLS-filtered policy_mode can be read by the same trusted transaction.
+    db.execute(select(
+        func.set_config("app.user_id", str(user.user_id), True),
+        func.set_config("app.role", role, True),
+        func.set_config("app.contractor_id", str(user.contractor_id or ""), True),
+        func.set_config("app.worker_id", str(user.worker_id or ""), True),
+        func.set_config("app.ulb_id", str(user.ulb_id or ""), True)))
     response.set_cookie(SESSION_COOKIE, token, max_age=settings.session_ttl_minutes * 60, httponly=True,
                         samesite="strict", secure=settings.cookie_secure, path="/")
     # session_token is for non-browser clients (Authorization: Bearer ...); the browser UI uses the HttpOnly cookie only.
-    return {"user": _user_view(user, role), "csrf_token": csrf, "session_token": token, "expires_at": expires}
+    return {"user": _user_view(user, role, db), "csrf_token": csrf, "session_token": token, "expires_at": expires}
 
 
 @router.post("/logout")
@@ -67,9 +80,14 @@ def logout(principal: Annotated[Principal, Depends(authenticate)], response: Res
 
 
 @router.get("/me")
-def me(principal: Annotated[Principal, Depends(authenticate)]):
+def me(principal: Annotated[Principal, Depends(authenticate)], db: DB):
+    policy_mode = (db.scalar(text("SELECT policy_mode FROM ulb WHERE ulb_id=:ulb"), {"ulb": principal.ulb_id})
+                   if principal.ulb_id is not None else None)
     return {"user": {"user_id": principal.user_id, "email": principal.email, "full_name": principal.full_name,
-                     "role": principal.role, "ulb_id": principal.ulb_id, "contractor_id": principal.contractor_id,
+                     "role": principal.role, "ulb_id": principal.ulb_id, "policy_mode": policy_mode,
+                     "educational": policy_mode == "EDUCATIONAL" if policy_mode is not None else None,
+                     "policy_provenance": "ULB policy setting stored in the application database; not an external legal citation." if policy_mode is not None else None,
+                     "contractor_id": principal.contractor_id,
                      "worker_id": principal.worker_id},
             "csrf_token": principal.csrf_token}
 

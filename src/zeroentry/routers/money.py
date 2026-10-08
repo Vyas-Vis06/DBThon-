@@ -123,6 +123,12 @@ def submit_invoice(body: InvoiceIn, db: DB, principal: Principal = Depends(requi
 
 
 def _decide(db, invoice_id: int, principal: Principal, status: str) -> dict:
+    # Keep the same serialization order as report intake and invoice creation: complaint first,
+    # invoice second. This prevents a payment/report deadlock and lets paid-first remain final.
+    db.execute(text("""
+      SELECT c.complaint_id FROM invoice i JOIN job j USING(job_id)
+      JOIN complaint c USING(complaint_id) WHERE i.invoice_id=:invoice FOR UPDATE OF c
+    """), {"invoice": invoice_id}).first()
     row = db.scalar(select(Invoice).where(Invoice.invoice_id == invoice_id).with_for_update())
     if row is None:
         raise NotFound("No such invoice.")

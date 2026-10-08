@@ -69,7 +69,7 @@ def test_a_worker_has_one_role_per_permit_so_a_standby_can_never_also_enter(conn
 
 
 def test_only_unused_drafts_can_be_deleted_and_they_take_crew_and_gear_with_them(conn, f):
-    s = f.gate_scenario(yesterday_ist(), readings={"TOP": None, "MID": None, "BOTTOM": None})
+    s = f.gate_scenario(yesterday_ist(), readings={"TOP": None, "MID": None, "BOTTOM": None}, include_new_evidence=False)
     conn.execute("DELETE FROM entry_permit WHERE permit_id = %s", (s["permit"],))          # cascades
     assert conn.execute("SELECT count(*) AS n FROM permit_crew WHERE permit_id = %s", (s["permit"],)).fetchone()["n"] == 0
     s2 = f.gate_scenario(yesterday_ist())                                                   # has readings
@@ -99,11 +99,14 @@ def test_a_reading_from_a_detector_out_of_calibration_that_day_is_refused(conn, 
     f.reading(s["permit"], on_last_day, "TOP", s["at"] - timedelta(minutes=5), s["supervisor"])
 
 
-def test_future_dated_readings_and_unauthorised_recorders_are_refused(conn, f):
+def test_future_dated_readings_are_retained_but_fail_latest_and_unauthorised_recorders_are_refused(conn, f):
     s = f.gate_scenario(yesterday_ist(), readings={"TOP": None})
     from datetime import datetime, timezone
-    with expect("ZE002", "future"):
-        f.reading(s["permit"], s["detector"], "TOP", datetime.now(timezone.utc) + timedelta(hours=1), s["supervisor"])
+    future_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    reading_id = f.reading(s["permit"], s["detector"], "TOP", future_at, s["supervisor"])
+    assert conn.execute("SELECT taken_at FROM gas_reading WHERE reading_id=%s", (reading_id,)).fetchone()["taken_at"] == future_at
+    from tests.db.test_entry_gate import authorise, failed
+    assert {"GAS_TOP", "GAS_COMPLETE_SOURCE"} <= failed(authorise(conn, s))
     worker_login = f.user("WORKER", worker_id=f.worker(s["contractor"]))
     with expect("ZE006", "sign off"):
         f.reading(s["permit"], s["detector"], "TOP", s["at"] - timedelta(minutes=5), worker_login)
@@ -178,6 +181,68 @@ def test_only_entrants_may_enter_and_historical_window_overruns_are_preserved(co
 def test_backdated_open_entry_cannot_bypass_current_server_clock_admission(conn, live_current):
     with expect("ZE002", "server clock"):
         enter(conn, live_current, "e1", -1440, None)
+
+
+def test_adverse_serial_asset_change_commits_stop_and_preserves_open_entry_until_truthful_exit(conn, live_current):
+    s=live_current
+    entry_id=enter(conn,s,"e1",0,None)
+    old_revision=conn.execute("SELECT evidence_revision FROM entry_permit WHERE permit_id=%s",(s["permit"],)).fetchone()["evidence_revision"]
+    conn.execute("UPDATE gear_asset SET status='OUT_OF_SERVICE' WHERE gear_asset_id=%s",(s["site_asset"],))
+    permit=conn.execute("SELECT status,evidence_revision FROM entry_permit WHERE permit_id=%s",(s["permit"],)).fetchone()
+    assert permit["status"]=="ABORTED" and permit["evidence_revision"]>old_revision
+    assert conn.execute("SELECT count(*) FROM permit_safety_event WHERE permit_id=%s AND reason_code='CURRENT_CLAUSE_FAILED'",
+                        (s["permit"],)).fetchone()["count"]>=1
+    assert conn.execute("SELECT upper_inf(period) AS is_open FROM entry_log WHERE entry_id=%s",(entry_id,)).fetchone()["is_open"] is True
+    assert conn.execute("SELECT count(*) AS n FROM permit_resource_reservation WHERE permit_id=%s AND released_at IS NULL",
+                        (s["permit"],)).fetchone()["n"]>0
+    with expect("ZE003"):
+        enter(conn,s,"e2",0,None)
+    conn.execute("UPDATE entry_log SET period=tstzrange(lower(period),clock_timestamp(),'[)') WHERE entry_id=%s",(entry_id,))
+    assert conn.execute("SELECT exit_recorded_at IS NOT NULL AS exited FROM entry_log WHERE entry_id=%s",(entry_id,)).fetchone()["exited"] is True
+    assert conn.execute("SELECT count(*) AS n FROM permit_resource_reservation WHERE permit_id=%s AND released_at IS NULL",
+                        (s["permit"],)).fetchone()["n"]==0
+
+
+def test_safe_asset_revision_reissues_receipt_and_rejects_the_old_receipt_id(conn, live_current):
+    s=live_current
+    old=conn.execute("SELECT receipt_id FROM permit_decision_receipt WHERE permit_id=%s AND decision='AUTHORISED' "
+                     "ORDER BY receipt_id DESC LIMIT 1",(s["permit"],)).fetchone()["receipt_id"]
+    conn.execute("UPDATE gear_asset SET inspection_valid_until='2098-12-31' WHERE gear_asset_id=%s",(s["site_asset"],))
+    current=conn.execute("SELECT receipt_id,evidence_revision FROM permit_decision_receipt WHERE permit_id=%s AND decision='AUTHORISED' "
+                         "ORDER BY receipt_id DESC LIMIT 1",(s["permit"],)).fetchone()
+    assert current["receipt_id"]!=old
+    assert current["evidence_revision"]==conn.execute("SELECT evidence_revision FROM entry_permit WHERE permit_id=%s",
+                                                       (s["permit"],)).fetchone()["evidence_revision"]
+    period=Range(datetime.now(IST),None,"[)")
+    with expect("ZE001","current decision receipt"):
+        conn.execute("INSERT INTO entry_log(permit_id,worker_id,period,recorded_by,receipt_id) VALUES(%s,%s,%s,%s,%s)",
+                     (s["permit"],s["e1"],period,s["supervisor"],old))
+    entry=conn.execute("INSERT INTO entry_log(permit_id,worker_id,period,recorded_by,receipt_id) VALUES(%s,%s,%s,%s,%s) RETURNING entry_id",
+                       (s["permit"],s["e1"],period,s["supervisor"],current["receipt_id"])).fetchone()
+    assert entry["entry_id"]
+
+
+def test_adverse_gas_reading_commits_stop_and_retains_open_entry(conn, f, live_current):
+    s=live_current
+    entry_id=enter(conn,s,"e1",0,None)
+    old_receipt=conn.execute("SELECT receipt_id FROM permit_decision_receipt WHERE permit_id=%s AND decision='AUTHORISED' "
+                             "ORDER BY receipt_id DESC LIMIT 1",(s["permit"],)).fetchone()["receipt_id"]
+    # A recent real adverse observation must commit together with the stop; no trigger-order
+    # failure may roll either the reading or the terminal safety state back.
+    reading_id=f.reading(s["permit"],s["detector"],"TOP",datetime.now(timezone.utc)-timedelta(seconds=1),
+                         s["supervisor"],o2=15.0)
+    assert conn.execute("SELECT o2_pct FROM gas_reading WHERE reading_id=%s",(reading_id,)).fetchone()["o2_pct"]==15.0
+    permit=conn.execute("SELECT status,evidence_revision FROM entry_permit WHERE permit_id=%s",(s["permit"],)).fetchone()
+    assert permit["status"]=="ABORTED"
+    assert conn.execute("SELECT count(*) AS n FROM permit_safety_event WHERE permit_id=%s AND reason_code='CURRENT_CLAUSE_FAILED'",
+                        (s["permit"],)).fetchone()["n"]>=1
+    assert conn.execute("SELECT upper_inf(period) AS is_open FROM entry_log WHERE entry_id=%s",(entry_id,)).fetchone()["is_open"] is True
+    assert conn.execute("SELECT count(*) AS n FROM permit_decision_receipt WHERE receipt_id=%s",(old_receipt,)).fetchone()["n"]==1
+    with expect("ZE003"):
+        enter(conn,s,"e2",0,None)
+    conn.execute("UPDATE entry_log SET period=tstzrange(lower(period),clock_timestamp(),'[)') WHERE entry_id=%s",(entry_id,))
+    assert conn.execute("SELECT exit_recorded_at IS NOT NULL AS exited FROM entry_log WHERE entry_id=%s",
+                        (entry_id,)).fetchone()["exited"] is True
 
 
 def test_a_full_ninety_minute_stretch_requires_the_configured_thirty_minute_rest(conn, live_current):

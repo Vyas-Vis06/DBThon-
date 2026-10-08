@@ -3,9 +3,9 @@ the database re-checks everything that matters (constraints and triggers), so th
 
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator
+from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator, model_validator
 
 Name = Annotated[str, Field(min_length=1, max_length=200)]
 Text = Annotated[str, Field(min_length=1, max_length=2000)]
@@ -186,15 +186,29 @@ class GearIssueIn(In):
     worker_id: int
     gear_code: Annotated[str, Field(pattern=r"^[A-Z0-9_]{2,40}$")]
     serial_no: Annotated[str, Field(min_length=1, max_length=60)]
+    gear_asset_id: int | None = Field(default=None, gt=0)
+
+
+class GearAssetIn(In):
+    ulb_id: int = Field(gt=0)
+    gear_code: Annotated[str, Field(pattern=r"^[A-Z0-9_]{2,40}$")]
+    serial_no: Annotated[str, Field(min_length=1, max_length=60)]
+    status: Literal["USABLE", "OUT_OF_SERVICE", "RETIRED"] = "USABLE"
+    inspection_valid_until: date | None = None
+
+
+class ScopeAssignmentIn(In):
+    reason: Annotated[str, Field(min_length=20, max_length=500)]
 
 
 class ReadingIn(In):
     detector_id: int
     depth_level: Depth
-    o2_pct: Annotated[Decimal, Field(ge=0, le=100, max_digits=4, decimal_places=1)]
-    h2s_ppm: NonNeg
-    lel_pct: Pct
-    co_ppm: NonNeg
+    o2_pct: Annotated[Decimal, Field(ge=0, le=100, max_digits=4, decimal_places=1)] | None = None
+    h2s_ppm: NonNeg | None = None
+    lel_pct: Pct | None = None
+    co_ppm: NonNeg | None = None
+    source_mode: Literal["SIMULATED", "TYPED"] = "TYPED"
     taken_at: datetime | None = None      # default: now (server clock); may only be a little in the past
 
     @field_validator("taken_at")
@@ -208,6 +222,7 @@ class ReadingIn(In):
 
 class EntryIn(In):
     worker_id: int
+    receipt_id: int | None = Field(default=None, gt=0)
     entered_at: datetime
     exited_at: datetime | None = None
 
@@ -232,6 +247,84 @@ class ExitIn(In):
 
 class ReasonIn(In):
     reason: Annotated[str, Field(min_length=5, max_length=500)]
+
+
+class ReadinessIn(In):
+    kind: Literal["STRUCTURE", "ISOLATION", "VENTILATION", "RESCUE", "COMMUNICATION", "TRAFFIC", "MEDICAL"]
+    passed: bool
+    expires_at: datetime
+    details: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("expires_at")
+    @classmethod
+    def _readiness_time(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("Give the time with its UTC offset.")
+        return value
+
+
+class SiteGearIn(In):
+    gear_asset_id: int = Field(gt=0)
+
+
+class IncidentVictimIn(In):
+    victim_key: Annotated[str, Field(min_length=1, max_length=100)]
+    worker_id: int | None = Field(default=None, gt=0)
+    display_alias: Annotated[str, Field(min_length=1, max_length=200)]
+    outcome: Literal["FATAL", "INJURY", "OTHER"]
+
+
+class IncidentReportIn(In):
+    ulb_id: int = Field(gt=0)
+    job_id: int | None = Field(default=None, gt=0)
+    permit_id: int | None = Field(default=None, gt=0)
+    contractor_id: int | None = Field(default=None, gt=0)
+    occurred_at: datetime
+    site_label: Annotated[str, Field(min_length=1, max_length=300)]
+    hazard_type: Annotated[str, Field(min_length=1, max_length=100)]
+    description: Text
+    reported_sections: Annotated[str, Field(max_length=500)] | None = None
+    victims: Annotated[list[IncidentVictimIn], Field(min_length=1, max_length=100)]
+
+    @field_validator("occurred_at")
+    @classmethod
+    def _incident_time(cls, value: datetime) -> datetime:
+        return _not_future(value)
+
+    @field_validator("victims")
+    @classmethod
+    def _unique_victims(cls, victims: list[IncidentVictimIn]) -> list[IncidentVictimIn]:
+        keys = [victim.victim_key for victim in victims]
+        if len(keys) != len(set(keys)):
+            raise ValueError("victim_key values must be unique within the report.")
+        return victims
+
+
+class CompletionClaimIn(In):
+    ulb_id: int | None = Field(default=None, gt=0)
+    source: Annotated[str, Field(min_length=1, max_length=100)]
+    external_id: Annotated[str, Field(min_length=1, max_length=200)]
+    external_job_ref: Annotated[str, Field(min_length=1, max_length=200)]
+    claimed_status: Annotated[str, Field(min_length=1, max_length=40)]
+    claimed_at: datetime
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("claimed_at")
+    @classmethod
+    def _claim_time(cls, value: datetime) -> datetime:
+        return _not_future(value)
+
+
+class CompletionClaimReviewIn(In):
+    decision: Literal["MATCHED", "AMBIGUOUS"]
+    job_id: int | None = Field(default=None, gt=0)
+    reason: Annotated[str, Field(min_length=20, max_length=1000)]
+
+    @model_validator(mode="after")
+    def _job_for_decision(self):
+        if (self.decision == "MATCHED") != (self.job_id is not None):
+            raise ValueError("MATCHED requires a job_id; AMBIGUOUS must not include one.")
+        return self
 
 
 # --- consequences -------------------------------------------------------------------------------------------------

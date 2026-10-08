@@ -12,6 +12,10 @@ EXPECTED_TABLES = {
     "invoice_hold", "detection_rule", "shadow_entry_alert", "shadow_entry_alert_event", "rule_parameter",
     "legal_clause", "audit_log", "permit_safety_event", "policy_source", "legal_clause_source",
     "rule_parameter_history", "permit_authorization_decision",
+    "gear_asset", "permit_site_gear", "permit_readiness", "permit_resource_reservation",
+    "permit_decision_receipt", "completion_claim", "completion_projection",
+    "command_dedup", "outbox_scope_counter", "outbox_event", "incident_report",
+    "incident_report_victim", "incident_assessment_case", "ulb_contractor_scope", "ulb_detector_scope",
 }
 
 
@@ -38,7 +42,7 @@ def test_relationships_are_enforced_by_many_foreign_keys(conn):
 def test_reference_data_is_loaded_by_migrations(conn):
     one = lambda sql: conn.execute(sql).fetchone()["n"]  # noqa: E731
     assert one("SELECT count(*) AS n FROM role") == 6
-    assert one("SELECT count(*) AS n FROM legal_clause") == 11
+    assert one("SELECT count(*) AS n FROM legal_clause") == 19
     assert one("SELECT count(*) AS n FROM gear_item WHERE statutory") == 5
     assert one("SELECT count(*) AS n FROM detection_rule WHERE enabled") == 2
     assert one("SELECT count(*) AS n FROM rule_parameter WHERE is_assumption") >= 6

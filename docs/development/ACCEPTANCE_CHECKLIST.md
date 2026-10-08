@@ -7,7 +7,7 @@ was run; `[~]` = done with a stated limit. Last full pass: 2026-10-07 (see [DEV_
 
 | | Requirement | Evidence |
 |---|---|---|
-| [x] | ≥ 8 related tables | 35 tables ([SCHEMA_REFERENCE.md](../SCHEMA_REFERENCE.md)); `tests/db/test_schema.py::test_application_tables_exist` |
+| [x] | ≥ 8 related tables | 50 tables ([SCHEMA_REFERENCE.md](../SCHEMA_REFERENCE.md)); `tests/db/test_schema.py::test_application_tables_exist` |
 | [x] | ≥ 4 entities, ≥ 3 relationships, including M:N | entry_permit M:N worker through `permit_crew` ([ER_DIAGRAM.md](../ER_DIAGRAM.md), FK relationships drift-tested) |
 | [x] | Normalised to 3NF, exceptions justified | [DATABASE_DESIGN.md §4](../DATABASE_DESIGN.md#4-normalisation-3nf-and-the-deliberate-exceptions) |
 | [x] | Keys and constraints (PK, FK, UNIQUE, CHECK, NOT NULL) | every table has a PK (`test_every_table_has_a_primary_key`); CHECKs reject bad rows (`test_declarative_checks_reject_bad_rows`) |
@@ -15,7 +15,7 @@ was run; `[~]` = done with a stated limit. Last full pass: 2026-10-07 (see [DEV_
 | [x] | Multi-table JOINs | `database/queries/01_joins.sql`; the permit list joins six tables (`routers/permits.py`) |
 | [x] | Aggregates (COUNT, SUM, AVG, MIN, MAX, GROUP BY, HAVING) | `database/queries/02_aggregates.sql`; `/reports/summary`, `/reports/shadow-summary` |
 | [x] | Search and filtering | `database/queries/03_search_and_filter.sql`; `q` prefix search and filters on list endpoints |
-| [x] | Views | 10 views, all `security_invoker` ([DATABASE_DESIGN.md §7](../DATABASE_DESIGN.md#7-programmable-objects)) |
+| [x] | Views | Security-invoker operational views, including live completion reconciliation ([SCHEMA_REFERENCE.md](../SCHEMA_REFERENCE.md)) |
 | [x] | Transactions (commit, rollback, atomic failure) | `database/queries/06_transactions.sql`; `record_incident` rollback test; one transaction per API request |
 | [x] | Triggers | gate, freeze, gas, entry, waiver, job, invoice, alert, audit, append-only (`tests/db/test_entry_rules.py`, `test_entry_gate.py`) |
 | [x] | Stored procedure and functions | `record_incident` (procedure), `authorise_entry`, `permit_clause_check`, `scan_shadow_entries`, ... |

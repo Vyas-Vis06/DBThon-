@@ -1,0 +1,183 @@
+{
+  "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+  "measured_at": "2026-10-07T18:27:25.864861+00:00",
+  "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+  "dirty": true,
+  "schema_revision": "0016",
+  "source_sha256": "97e55be1c0bf21968b569c78c865f1c543dd43d38535404568e4305ef7b46301",
+  "machine": "Windows-10-10.0.19045-SP0",
+  "python": "3.12.14",
+  "junit_report": "C:/Users/Soham/Documents/Codex/2026-10-07/how/zeroentry-integrated/.reports/integration.xml",
+  "verification": {
+    "source_sha256": "97e55be1c0bf21968b569c78c865f1c543dd43d38535404568e4305ef7b46301",
+    "pytest_exit_code": 0,
+    "started_at": "2026-10-07T18:25:12.770518+00:00",
+    "finished_at": "2026-10-07T18:27:25.762861+00:00",
+    "command": [
+      "python",
+      "-m",
+      "pytest",
+      "-n",
+      "4",
+      "-q",
+      "--junitxml=.reports/integration.xml"
+    ]
+  },
+  "labs": [
+    {
+      "id": "LAB1-DDL",
+      "title": "DDL and DML",
+      "artifact_path": "database/migrations/sql/0002_core_schema.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "21 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB1-DML",
+      "title": "DDL and DML",
+      "artifact_path": "database/seeds",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "6 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB2-PASS",
+      "title": "Constraints accepted",
+      "artifact_path": "tests/db/test_schema.py",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "21 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB2-REJECT",
+      "title": "Constraints rejected",
+      "artifact_path": "tests/db/test_schema.py",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "21 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB3-BOUNDARY",
+      "title": "Scalar time functions",
+      "artifact_path": "database/queries/05_views_functions_procedures.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "1 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB4-AGG",
+      "title": "Operators and aggregates",
+      "artifact_path": "database/queries/02_aggregates.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "1 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB5-JOIN",
+      "title": "Queries and joins",
+      "artifact_path": "database/queries/01_joins.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "1 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB5-ANTI",
+      "title": "Relational division and anti-join",
+      "artifact_path": "database/queries/04_division_and_anti_join.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "1 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB5-VIEW",
+      "title": "Views",
+      "artifact_path": "database/queries/05_views_functions_procedures.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "1 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB6-FN",
+      "title": "Database functions",
+      "artifact_path": "tests/db/test_entry_gate.py",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "43 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB6-PROC",
+      "title": "Atomic procedures",
+      "artifact_path": "tests/db/test_consequences.py",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "17 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB6-TRG",
+      "title": "Database triggers",
+      "artifact_path": "database/queries/07_trigger_refusals.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "1 passing test cases reference this proof"
+    },
+    {
+      "id": "LAB6-CURSOR",
+      "title": "Explicit cursor",
+      "artifact_path": "database/queries/08_cursor_and_assertion_lab.sql",
+      "status": "TESTED",
+      "url": null,
+      "run_id": "35fedf4c-0e80-4910-a0cf-29dc52de7445",
+      "git_sha": "a3db1b4ce104477cb04b2c73b2f55f4c6113d5d4",
+      "measured_at": "2026-10-07T18:27:25.864861+00:00",
+      "summary": "1 passing test cases reference this proof"
+    }
+  ],
+  "summary": {
+    "total": 617,
+    "passed": 617,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "browser_passed": 3
+  },
+  "limitations": [
+    "Local synthetic PostgreSQL tests, not field deployment or remote CI results.",
+    "JUnit/build provenance is trusted locally; it is not external signed attestation."
+  ]
+}

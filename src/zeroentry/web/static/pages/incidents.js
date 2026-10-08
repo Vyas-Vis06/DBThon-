@@ -3,8 +3,9 @@ import { api, badge, fmtDT, form, guard, h, isRole, kv, money, options, pager, q
 export default async function (root) {
   const recorder = isRole('ADMIN', 'ENGINEER', 'SUPERVISOR');
   const payer = isRole('ADMIN', 'ENGINEER');
-  root.append(h('h1', {}, 'Incidents and compensation'),
-    h('p', { class: 'muted' }, 'Recording a fatality is ONE atomic transaction: the incident, a ₹30-lakh compensation case with a deadline, the contractor’s blacklisting, the stop-work on the job’s permits and the hold on its invoices all happen together, or not at all.'));
+  root.append(h('h1', {}, 'Linked incident records and case history'),
+    h('p', { class: 'muted' }, 'This legacy workflow is for reports already linked to registered workers, sites, or jobs. Use Incident reports for standalone locations and multiple victim aliases.'),
+    h('p', { class: 'banner warn' }, 'Case reference amounts are not awards. A payment entry is an internal record and does not prove that money was externally disbursed. This screen preserves historical linked-record operations; it does not issue legal findings.'));
 
   const incidentsTab = async (box) => {
     const filters = { incident_type: '', offset: 0 };
@@ -44,7 +45,7 @@ export default async function (root) {
     const workers = await options('/workers?limit=200', (w) => [w.worker_id, `${w.full_name} · ${w.namaste_id}`]);
     const manholes = await options('/manholes?limit=200', (m) => [m.manhole_id, m.code]);
     const outcome = h('div');
-    box.append(h('p', { class: 'muted' }, 'Link the permit if there was one. A death with NO permit is itself evidence of a shadow entry, and still triggers every consequence.'),
+    box.append(h('p', { class: 'muted' }, 'This linked-record intake requires a registered worker and manhole. It cannot represent unknown identities or private sites; use the separate Incident reports form for those cases.'),
       form([
         { name: 'incident_type', label: 'Type', type: 'select', required: true, options: ['FATALITY', 'DISABILITY', 'NEAR_MISS'].map((t) => ({ value: t, label: t })) },
         { name: 'occurred_at', label: 'Occurred (India time)', type: 'datetime', value: 'now', required: true },
@@ -54,11 +55,11 @@ export default async function (root) {
         { name: 'job_id', label: 'Job # (if known)', type: 'number', step: '1', min: 1 },
         { name: 'description', label: 'What happened', type: 'textarea', required: true, wide: true },
       ], async (v) => {
-        if (v.incident_type === 'FATALITY' && !confirm('Recording a FATALITY blacklists the contractor, aborts the job’s permits and holds its invoices, all at once. Continue?')) return;
+        if (v.incident_type === 'FATALITY' && !confirm('Record this linked fatality report and its configured internal case effects? This does not establish a legal finding or external payment. Continue?')) return;
         const r = await api('POST', '/incidents', v);
-        outcome.replaceChildren(h('p', { class: 'banner ok' }, `Incident #${r.incident_id} recorded in one transaction.`), kv([
-          ['Compensation case', r.compensation_case ? `${money(r.compensation_case.amount_due)} due by ${r.compensation_case.due_by}` : 'none (near miss)'],
-          ['Contractor', `${r.contractor.name}: ${r.contractor.status}`], ['Invoices held', r.invoice_holds.length ? String(r.invoice_holds.length) : 'none visible to you'],
+        outcome.replaceChildren(h('p', { class: 'banner neutral' }, `Linked report #${r.incident_id} recorded. Internal effects shown below are system records only.`), kv([
+          ['Case reference', r.compensation_case ? `${money(r.compensation_case.amount_due)} · due date ${r.compensation_case.due_by} · not an award` : 'none (near miss)'],
+          ['Contractor record', r.contractor ? `${r.contractor.name}: ${r.contractor.status}` : 'not linked'], ['Invoices placed on hold', r.invoice_holds?.length ? String(r.invoice_holds.length) : 'none visible to you'],
           ['Permit', r.permit_id ? h('a', { href: '/app/permit?id=' + r.permit_id }, '#' + r.permit_id + ' (aborted if it was authorised)') : 'no permit linked']]));
       }, { submit: 'Record incident', danger: true }), outcome);
   };
