@@ -27,7 +27,12 @@ See [restore](../evidence/restore.json), [equal-policy interleaving](../evidence
 The full [implementation plan](../plan/README.md) and detailed [A](WORKER_A_EXECUTION.md), [B](WORKER_B_EXECUTION.md),
 [C](WORKER_C_EXECUTION.md) instructions are retained for your team. Work in non-overlapping lanes and agree on contracts.
 
-Branch: `codex/zeroentry-ze2-integration`. Main is not merged or rewritten. Review before merging. Do not commit
+Branch: `codex/zeroentry-ze2-integration`. Main is not merged or rewritten. Review before merging.
+The integration starts from downloaded commit `a3db1b4`. During final publication, upstream main had advanced to
+`6ebc5e2` with additional UI, startup and presentation work. Those newer changes are untouched and not merged here;
+review overlapping UI/docs changes before any eventual merge. This branch's 617-test result applies to this branch only.
+
+Do not commit
 credentials, `.env`, `.pgdata`, dumps or virtual environments. To regenerate proof install `.[dev,browser]`, install
 Chromium through Playwright, then run `python scripts/verify_release.py --workers 4`.
 

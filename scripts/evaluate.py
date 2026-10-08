@@ -527,11 +527,11 @@ def render(results: dict, meta: dict) -> str:
         "",
         "## E2 Enforcement (one invalid write per rule, any client)",
         "",
-        "Baseline = the same schema and constraints with every rule trigger disabled "
-        "(`database/evaluation/rules_in_app_code.sql`): the rules live in application code, so any other client "
-        "(a script, a second app, a SQL console, a buggy endpoint) would not run those checks.",
+        "Comparator = the same schema and constraints with every rule trigger disabled "
+        "(`database/evaluation/rules_in_app_code.sql`). This is an unguarded-database ablation isolating the "
+        "contribution of rule triggers, not an implemented application validator or a commercial-product comparison.",
         "",
-        "| Rule | Invalid write | ZeroEntry | Baseline (rules in app code) |", "|---|---|---|---|",
+        "| Rule | Invalid write | ZeroEntry | Unguarded-database ablation |", "|---|---|---|---|",
         *(f"| {r['rule']} | {r['write']} | "
           + " | ".join(("refused, `{}`: {}".format(o["sqlstate"], o["message"].replace("|", "/")) if o["refused"]
                         else "**accepted**") for o in (r["zeroentry"], r["baseline"])) + " |" for r in e2),
